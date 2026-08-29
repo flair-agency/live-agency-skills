@@ -1,0 +1,18 @@
+{
+  "name": "@fixture/activity-pasted-source",
+  "version": "1.0.0",
+  "type": "module",
+  "peerDependencies": {
+    "@live-agency-skills/source-provider-api": "^1.0.0"
+  },
+  "liveAgencyProvider": {
+    "schemaVersion": 1,
+    "provides": ["creator-activity-source/v1"],
+    "inputKinds": ["text/markdown"],
+    "unattended": false,
+    "execution": {
+      "kind": "module",
+      "entry": "./src/index.js"
+    }
+  }
+}

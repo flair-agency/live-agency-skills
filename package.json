@@ -1,0 +1,19 @@
+{
+  "name": "live-agency-skills",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "fixtures/*"
+  ],
+  "dependencies": {
+    "@fixture/activity-pasted-source": "1.0.0",
+    "@fixture/invitation-instruction-source": "1.0.0",
+    "@live-agency-skills/source-provider-api": "1.0.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check:public": "node scripts/check-public-content.mjs"
+  }
+}

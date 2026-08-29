@@ -1,0 +1,11 @@
+{
+  "name": "@live-agency-skills/source-provider-api",
+  "version": "1.0.0",
+  "description": "Source-neutral provider discovery and normalized contracts for live agency skills",
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": [
+    "src"
+  ],
+  "license": "MIT"
+}

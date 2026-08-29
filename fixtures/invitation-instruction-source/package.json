@@ -1,0 +1,17 @@
+{
+  "name": "@fixture/invitation-instruction-source",
+  "version": "1.0.0",
+  "peerDependencies": {
+    "@live-agency-skills/source-provider-api": "^1.0.0"
+  },
+  "liveAgencyProvider": {
+    "schemaVersion": 1,
+    "provides": ["creator-invitation-observation-source/v1"],
+    "inputKinds": ["agent/instructions"],
+    "unattended": false,
+    "execution": {
+      "kind": "instructions",
+      "resource": "./instructions/provider.md"
+    }
+  }
+}
