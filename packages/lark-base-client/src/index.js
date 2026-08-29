@@ -209,7 +209,7 @@ export class LarkBaseClient {
     return item.tmp_download_url;
   }
 
-  async attachmentSha256(attachment) {
+  async downloadAttachment(attachment) {
     const fileToken = String(attachment?.file_token ?? "");
     if (!/^[-_A-Za-z0-9]+$/.test(fileToken)) throw new LarkApiError("attachment file token is invalid");
     const response = await this.fetchImpl(await this.temporaryDownloadUrl(fileToken), {
@@ -224,7 +224,24 @@ export class LarkBaseClient {
     if (content.length < 1 || content.length > MAX_MEDIA_BYTES) {
       throw new LarkApiError("attachment size is invalid");
     }
-    return createHash("sha256").update(content).digest("hex");
+    const suppliedName = String(attachment?.name ?? attachment?.file_name ?? "").normalize("NFKC").trim();
+    const safeName = suppliedName && !/[\\/\0\r\n]/.test(suppliedName)
+      ? suppliedName.slice(0, 255)
+      : `${fileToken}.bin`;
+    const suppliedMime = String(response.headers.get("content-type") ?? attachment?.type ?? "").split(";", 1)[0].trim();
+    const mimeType = suppliedMime && !/[\r\n]/.test(suppliedMime) ? suppliedMime : "application/octet-stream";
+    return {
+      fileToken,
+      name: safeName,
+      mimeType,
+      size: content.length,
+      sha256: createHash("sha256").update(content).digest("hex"),
+      content,
+    };
+  }
+
+  async attachmentSha256(attachment) {
+    return (await this.downloadAttachment(attachment)).sha256;
   }
 
   async uploadMedia(appToken, avatar) {

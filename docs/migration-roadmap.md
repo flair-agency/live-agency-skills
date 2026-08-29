@@ -10,8 +10,9 @@ explicitly completed.
 | --- | --- | --- |
 | Creator activity sync | Complete | Source acquisition providers and Lark configuration |
 | Creator invitation status sync | Complete | Observation provider and Lark configuration |
-| Creator profile compaction | Implemented | Lark identifiers and generated plans |
-| Creator live-history compaction | Implemented | Lark/Drive identifiers and archives |
+| Creator profile compaction | Complete | Lark identifiers and generated plans |
+| Creator live-history compaction | Complete | Lark/Drive identifiers and archives |
+| Creator invitation-status compaction | Complete | Lark/Drive identifiers, avatar backups, and restore archives |
 | Creator profile observation sync | Complete | Service-specific observation provider and Lark configuration |
 | Gift-history reconciliation | Complete | Export acquisition/schema, workbook/Lark identifiers, and account evidence |
 | Coin-expense reconciliation | Complete | Purchase evidence, expense candidates, service-specific registration, and organization accounting policy |

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creator invitation status compaction"
+  short_description: "Compact adjacent invitation-status history safely"
+  default_prompt: "Use $creator-invitation-status-compaction to prepare a reviewed dry run for compacting adjacent duplicate invitation-status history in Lark."

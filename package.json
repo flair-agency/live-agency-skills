@@ -15,7 +15,7 @@
     "@fixture/invitation-instruction-source": "1.0.0",
     "@fixture/invitation-observation-source": "1.0.0",
     "@fixture/profile-instruction-source": "1.0.0",
-    "@live-agency-skills/lark-base-client": "1.0.0",
+    "@live-agency-skills/lark-base-client": "1.1.0",
     "@live-agency-skills/private-runtime-files": "1.0.0",
     "@live-agency-skills/source-provider-api": "1.3.0"
   },
