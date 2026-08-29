@@ -13,6 +13,13 @@ import {
   replayGiftHistoryPlan,
   validateGiftHistoryPlan,
 } from "../skills/gift-history-sync/scripts/gift_history_core.mjs";
+import {
+  buildProjectionPlan,
+  buildProjectionTarget,
+  projectionPayload,
+  resolveProjectionFields,
+  validateProjectionConfig,
+} from "../skills/gift-history-sync/scripts/gift_projection_core.mjs";
 import { resolveGiftSource } from "../skills/gift-history-sync/scripts/resolve_gift_source.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
@@ -219,4 +226,137 @@ test("discovers and executes a normalized gift source through npm", async () => 
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+function projectionConfig() {
+  return validateProjectionConfig({
+    version: 1,
+    spreadsheet: { spreadsheetId: "synthetic-sheet" },
+    lark: {
+      accountProjection: {
+        appToken: "synthetic-app",
+        tableId: "synthetic-table",
+        sourceSheetId: 42,
+        backupDir: "/private/tmp/synthetic-backup",
+        fieldIds: {
+          recipient: "fldRecipient",
+          account: "fldAccount",
+          development: "fldDevelopment",
+          relationship: "fldRelationship",
+          scouting: "fldScouting",
+        },
+        keyFields: ["recipient", "account"],
+        amountFields: ["development", "relationship", "scouting"],
+        fieldTypes: {
+          recipient: { uiType: "Text", stripLeadingAt: true },
+          account: { uiType: "SingleSelect" },
+          development: { uiType: "Number", minimum: 0 },
+          relationship: { uiType: "Number", minimum: 0 },
+          scouting: { uiType: "Number", minimum: 0 },
+        },
+      },
+    },
+  }, "accountProjection");
+}
+
+function projectionFields(prefix = "Renamed ") {
+  return [
+    { field_id: "fldRecipient", field_name: `${prefix}Recipient`, ui_type: "Text" },
+    {
+      field_id: "fldAccount",
+      field_name: `${prefix}Account`,
+      ui_type: "SingleSelect",
+      property: { options: [{ name: "synthetic.sender" }] },
+    },
+    { field_id: "fldDevelopment", field_name: `${prefix}Development`, ui_type: "Number" },
+    { field_id: "fldRelationship", field_name: `${prefix}Relationship`, ui_type: "Number" },
+    { field_id: "fldScouting", field_name: `${prefix}Scouting`, ui_type: "Number" },
+  ];
+}
+
+test("gift projections resolve renamed Lark fields strictly by stable IDs", () => {
+  const config = projectionConfig();
+  const bindings = resolveProjectionFields(projectionFields(), config);
+  const target = buildProjectionTarget({ config, rows: [
+    {
+      recipient: "@synthetic.creator",
+      account: "synthetic.sender",
+      development: 10,
+      relationship: 20,
+      scouting: 30,
+    },
+    {
+      recipient: "synthetic.new",
+      account: "synthetic.sender",
+      development: 1,
+      relationship: 2,
+      scouting: 3,
+    },
+  ] });
+  const records = [
+    {
+      record_id: "rec-update",
+      fields: {
+        "Renamed Recipient": "synthetic.creator",
+        "Renamed Account": "synthetic.sender",
+        "Renamed Development": 9,
+        "Renamed Relationship": 20,
+        "Renamed Scouting": 30,
+      },
+    },
+    {
+      record_id: "rec-delete",
+      fields: {
+        "Renamed Recipient": "synthetic.old",
+        "Renamed Account": "synthetic.sender",
+        "Renamed Development": 1,
+        "Renamed Relationship": 1,
+        "Renamed Scouting": 1,
+      },
+    },
+  ];
+  const plan = buildProjectionPlan({ target, records, bindings, config });
+  assert.equal(plan.summary.createCount, 1);
+  assert.equal(plan.summary.updateCount, 1);
+  assert.equal(plan.summary.deleteCount, 1);
+  assert.deepEqual(
+    projectionPayload(plan.operations.creates[0], bindings, config, { includeKeys: true }),
+    {
+      "Renamed Recipient": "synthetic.new",
+      "Renamed Account": "synthetic.sender",
+      "Renamed Development": 1,
+      "Renamed Relationship": 2,
+      "Renamed Scouting": 3,
+    },
+  );
+});
+
+test("gift projections fail closed on field drift, select drift, and duplicate keys", () => {
+  const config = projectionConfig();
+  assert.throws(
+    () => resolveProjectionFields(
+      projectionFields().map((field) => field.field_id === "fldScouting" ? { ...field, ui_type: "Text" } : field),
+      config,
+    ),
+    /field type changed/,
+  );
+  const bindings = resolveProjectionFields(projectionFields(), config);
+  const badOptionTarget = buildProjectionTarget({ config, rows: [{
+    recipient: "synthetic.creator",
+    account: "missing.option",
+    development: 1,
+    relationship: 2,
+    scouting: 3,
+  }] });
+  assert.throws(
+    () => buildProjectionPlan({ target: badOptionTarget, records: [], bindings, config }),
+    /select option is missing/,
+  );
+  assert.throws(
+    () => buildProjectionTarget({ config, rows: [
+      { recipient: "@same", account: "synthetic.sender", development: 1 },
+      { recipient: "same", account: "synthetic.sender", development: 2 },
+    ] }),
+    /duplicate composite key/,
+  );
 });

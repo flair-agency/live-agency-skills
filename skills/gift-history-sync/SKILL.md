@@ -82,6 +82,12 @@ Before a create, update, or delete, perform a fresh dry run and require explicit
 approval of the exact target SHA and create/update/delete counts. Never apply a
 projection deletion to the canonical gift-event master.
 
+Follow [references/lark-projections.md](references/lark-projections.md) and use
+`scripts/sync_gift_projection.mjs`. It resolves current Lark display names from
+configured field IDs, writes only configured key/amount fields, saves a private
+backup, and verifies by rereading. A field-name change alone must not break or
+redirect the sync.
+
 Refresh curated identity/lifecycle copies only from their reviewed authority,
 never from source recipient-text evidence. Preserve timestamp precision and
 stop on duplicate composite keys or changed field types.
