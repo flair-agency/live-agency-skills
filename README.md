@@ -30,6 +30,9 @@ See [Provider architecture](docs/provider-architecture.md).
 - [`creator-invitation-status-sync`](skills/creator-invitation-status-sync/SKILL.md):
   discovers normalized observation providers, maintains transition-based Lark
   history through reviewed plans, and keeps observation-service details private.
+- [`creator-profile-compaction`](skills/creator-profile-compaction/SKILL.md):
+  retains representative profile observations using stable Lark field IDs and
+  requires hash-and-count approval before any deletion.
 
 Invitation-state compaction remains a separate planned migration because it is
 destructive maintenance and requires a different approval boundary.

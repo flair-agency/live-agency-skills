@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creator profile compaction"
+  short_description: "Safely retain representative profile observations"
+  default_prompt: "Use $creator-profile-compaction to create and inspect a dry-run plan for my Lark creator profile history. Do not delete anything without my explicit approval of the plan hash and count."
