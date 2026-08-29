@@ -33,6 +33,9 @@ See [Provider architecture](docs/provider-architecture.md).
 - [`creator-profile-compaction`](skills/creator-profile-compaction/SKILL.md):
   retains representative profile observations using stable Lark field IDs and
   requires hash-and-count approval before any deletion.
+- [`creator-live-history-compaction`](skills/creator-live-history-compaction/SKILL.md):
+  archives reversible session records before reviewed deletion and supports
+  conflict-checked restoration.
 
 Invitation-state compaction remains a separate planned migration because it is
 destructive maintenance and requires a different approval boundary.

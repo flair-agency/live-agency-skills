@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creator live-history compaction"
+  short_description: "Archive and safely compact reversible live history"
+  default_prompt: "Use $creator-live-history-compaction to dry-run my Lark live-history retention plan. Do not upload, delete, or restore without the corresponding explicit authorization."
