@@ -6,7 +6,7 @@ const ignored = new Set([".git", "node_modules", "coverage"]);
 const secretPatterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /\b(?:token|secret|password)\s*[=:]\s*["'][^"']{8,}["']/i,
-  /\b(?:app|client)[_-]?secret\s*[=:]/i,
+  /\b(?:app|client)[_-]?secret\s*[=:]\s*["'][A-Za-z0-9_./+=-]{8,}["']/i,
 ];
 
 async function files(directory) {

@@ -22,13 +22,15 @@ packages.
 
 See [Provider architecture](docs/provider-architecture.md).
 
-## Planned skill migrations
+## Skills
 
-- Creator activity metric synchronization
-- Creator invitation status maintenance
+- [`creator-activity-sync`](skills/creator-activity-sync/SKILL.md): validates
+  normalized monthly metrics, performs a dry run, updates only three configured
+  Lark fields when authorized, and verifies by rereading.
 
-They will be added only after their service-specific acquisition logic and
-organization-specific configuration have been separated from the public core.
+Creator invitation status maintenance is the next migration. It will be added
+only after service-specific observation logic and organization-specific
+configuration have been separated from the public core.
 
 ## Development
 

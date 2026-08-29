@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creator activity sync"
+  short_description: "Safely reconcile normalized monthly creator metrics to Lark"
+  default_prompt: "Use $creator-activity-sync to dry-run my normalized monthly creator activity metrics against Lark, then apply only if I explicitly requested an update."
