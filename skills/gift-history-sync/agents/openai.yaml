@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gift history sync"
+  short_description: "Safely merge partial gift snapshots into a durable master"
+  default_prompt: "Use $gift-history-sync to normalize this gift snapshot, prepare an append-preserving dry run, and wait for my approval before changing the master."

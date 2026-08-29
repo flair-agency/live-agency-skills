@@ -1,0 +1,23 @@
+{
+  "name": "@fixture/gift-history-source",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "peerDependencies": {
+    "@live-agency-skills/source-provider-api": "^1.0.0"
+  },
+  "liveAgencyProvider": {
+    "schemaVersion": 1,
+    "provides": [
+      "gift-history-snapshot-source/v1"
+    ],
+    "inputKinds": [
+      "application/x.synthetic-gift-history-request+json"
+    ],
+    "unattended": true,
+    "execution": {
+      "kind": "module",
+      "entry": "./src/index.js"
+    }
+  }
+}

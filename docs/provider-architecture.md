@@ -19,6 +19,7 @@ The first capabilities are:
 - `creator-activity-source/v1`
 - `creator-invitation-observation-source/v1`
 - `creator-profile-observation-source/v1`
+- `gift-history-snapshot-source/v1`
 
 A provider declares one or more capabilities under `liveAgencyProvider` in its
 `package.json`. It also declares compatible input kinds, execution kind, and

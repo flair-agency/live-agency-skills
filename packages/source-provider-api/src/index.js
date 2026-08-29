@@ -3,10 +3,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const API_PACKAGE_NAME = "@live-agency-skills/source-provider-api";
-export const API_VERSION = "1.1.0";
+export const API_VERSION = "1.2.0";
 export const ACTIVITY_CAPABILITY = "creator-activity-source/v1";
 export const INVITATION_CAPABILITY = "creator-invitation-observation-source/v1";
 export const PROFILE_OBSERVATION_CAPABILITY = "creator-profile-observation-source/v1";
+export const GIFT_HISTORY_CAPABILITY = "gift-history-snapshot-source/v1";
 
 export class ProviderResolutionError extends Error {
   constructor(code, message, details = {}) {
@@ -413,6 +414,72 @@ export function validateProfileObservations(snapshot) {
         `${liveLabel} likes`,
       );
     }
+  }
+  return snapshot;
+}
+
+function assertCalendarDate(value, label) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new TypeError(`${label} must be YYYY-MM-DD`);
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    throw new TypeError(`${label} is not a calendar date`);
+  }
+}
+
+function assertPlainText(value, label) {
+  if (typeof value !== "string" || !value || /[\t\r\n]/.test(value)) {
+    throw new TypeError(`${label} must be non-empty single-line text`);
+  }
+}
+
+export function validateGiftHistorySnapshot(snapshot) {
+  assertObject(snapshot, "gift-history snapshot");
+  if (snapshot.version !== 1) throw new TypeError("gift-history snapshot version is invalid");
+  assertCalendarDate(snapshot.snapshotDate, "gift-history snapshot snapshotDate");
+  assertIsoDateTime(snapshot.observedAt, "gift-history snapshot observedAt");
+  assertPlainText(snapshot.accountKey, "gift-history snapshot accountKey");
+  if (!/^[0-9a-f]{64}$/.test(snapshot.sourceSha256 ?? "")) {
+    throw new TypeError("gift-history snapshot sourceSha256 is invalid");
+  }
+  if (!Array.isArray(snapshot.events)) {
+    throw new TypeError("gift-history snapshot events must be an array");
+  }
+  if (snapshot.rowCount !== snapshot.events.length) {
+    throw new TypeError("gift-history snapshot rowCount must match events.length");
+  }
+
+  const keys = new Set();
+  let previous = null;
+  for (const [index, event] of snapshot.events.entries()) {
+    const label = `gift-history event ${index}`;
+    assertObject(event, label);
+    assertPlainText(event.eventKey, `${label} eventKey`);
+    assertPlainText(event.accountKey, `${label} accountKey`);
+    assertPlainText(event.recipientKey, `${label} recipientKey`);
+    assertIsoDateTime(event.occurredAt, `${label} occurredAt`);
+    if (!/^(?:0|[1-9]\d*)$/.test(event.amount ?? "")) {
+      throw new TypeError(`${label} amount must be a canonical non-negative integer string`);
+    }
+    if (event.accountKey !== snapshot.accountKey) {
+      throw new TypeError(`${label} accountKey does not match the snapshot`);
+    }
+    if (keys.has(event.eventKey)) throw new TypeError(`${label} eventKey is duplicated`);
+    keys.add(event.eventKey);
+    const ordering = [Date.parse(event.occurredAt), event.eventKey];
+    if (
+      previous &&
+      (ordering[0] < previous[0] || (ordering[0] === previous[0] && ordering[1] <= previous[1]))
+    ) {
+      throw new TypeError(`${label} is not strictly ordered by occurredAt and eventKey`);
+    }
+    previous = ordering;
   }
   return snapshot;
 }

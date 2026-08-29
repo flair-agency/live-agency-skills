@@ -39,6 +39,9 @@ See [Provider architecture](docs/provider-architecture.md).
 - [`creator-live-history-compaction`](skills/creator-live-history-compaction/SKILL.md):
   archives reversible session records before reviewed deletion and supports
   conflict-checked restoration.
+- [`gift-history-sync`](skills/gift-history-sync/SKILL.md): validates normalized
+  partial gift snapshots, preserves omitted master events, records recipient
+  evidence, and prepares content-bound reviewed commits and projections.
 
 Invitation-state compaction remains a separate planned migration because it is
 destructive maintenance and requires a different approval boundary.

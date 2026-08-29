@@ -13,7 +13,7 @@ explicitly completed.
 | Creator profile compaction | Implemented | Lark identifiers and generated plans |
 | Creator live-history compaction | Implemented | Lark/Drive identifiers and archives |
 | Creator profile observation sync | Complete | Service-specific observation provider and Lark configuration |
-| Gift-history reconciliation | Planned | Export data, workbook/Lark identifiers, and account evidence |
+| Gift-history reconciliation | Complete | Export acquisition/schema, workbook/Lark identifiers, and account evidence |
 | Coin-expense reconciliation | Under design | Portal acquisition and organization accounting policy |
 
 ## Private provider candidates
@@ -22,7 +22,7 @@ Private providers remain independently versioned repositories. They implement a
 public capability contract and are installed into a local npm composition root.
 
 - creator-profile observation acquisition;
-- gift-history export acquisition;
+- gift-history export acquisition and mobile download workflow;
 - coin receipt and expense-system acquisition/policy; and
 - any service-specific schema, URL, screen, or authenticated workflow.
 
