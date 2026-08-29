@@ -1,0 +1,18 @@
+{
+  "name": "@fixture/invitation-observation-source",
+  "version": "1.0.0",
+  "type": "module",
+  "peerDependencies": {
+    "@live-agency-skills/source-provider-api": "^1.0.0"
+  },
+  "liveAgencyProvider": {
+    "schemaVersion": 1,
+    "provides": ["creator-invitation-observation-source/v1"],
+    "inputKinds": ["application/x.synthetic-observation-request+json"],
+    "unattended": true,
+    "execution": {
+      "kind": "module",
+      "entry": "./src/index.js"
+    }
+  }
+}

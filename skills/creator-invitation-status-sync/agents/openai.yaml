@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creator invitation status sync"
+  short_description: "Maintain normalized invitation-status transitions in Lark"
+  default_prompt: "Use $creator-invitation-status-sync to prepare a reviewed dry run from normalized invitation observations, and apply it only if I explicitly approve the update."

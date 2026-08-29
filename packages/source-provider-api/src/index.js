@@ -270,6 +270,29 @@ export function validateInvitationObservations(snapshot) {
     if (typeof creator.state !== "string" || !creator.state.trim()) {
       throw new TypeError(`invitation creator ${index} state is required`);
     }
+    for (const key of ["externalUserId", "nickname"]) {
+      if (creator[key] !== undefined && typeof creator[key] !== "string") {
+        throw new TypeError(`invitation creator ${index} ${key} must be a string`);
+      }
+    }
+    if (creator.avatar !== undefined && creator.avatar !== null) {
+      assertObject(creator.avatar, `invitation creator ${index} avatar`);
+      if (typeof creator.avatar.path !== "string" || !creator.avatar.path) {
+        throw new TypeError(`invitation creator ${index} avatar.path is required`);
+      }
+      if (!/^[0-9a-f]{64}$/.test(creator.avatar.sha256 ?? "")) {
+        throw new TypeError(`invitation creator ${index} avatar.sha256 is invalid`);
+      }
+      if (!Number.isSafeInteger(creator.avatar.size) || creator.avatar.size < 1) {
+        throw new TypeError(`invitation creator ${index} avatar.size is invalid`);
+      }
+      if (typeof creator.avatar.name !== "string" || !creator.avatar.name) {
+        throw new TypeError(`invitation creator ${index} avatar.name is required`);
+      }
+      if (typeof creator.avatar.mimeType !== "string" || !creator.avatar.mimeType.startsWith("image/")) {
+        throw new TypeError(`invitation creator ${index} avatar.mimeType is invalid`);
+      }
+    }
   }
   return snapshot;
 }

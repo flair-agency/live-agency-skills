@@ -27,10 +27,12 @@ See [Provider architecture](docs/provider-architecture.md).
 - [`creator-activity-sync`](skills/creator-activity-sync/SKILL.md): validates
   normalized monthly metrics, performs a dry run, updates only three configured
   Lark fields when authorized, and verifies by rereading.
+- [`creator-invitation-status-sync`](skills/creator-invitation-status-sync/SKILL.md):
+  discovers normalized observation providers, maintains transition-based Lark
+  history through reviewed plans, and keeps observation-service details private.
 
-Creator invitation status maintenance is the next migration. It will be added
-only after service-specific observation logic and organization-specific
-configuration have been separated from the public core.
+Invitation-state compaction remains a separate planned migration because it is
+destructive maintenance and requires a different approval boundary.
 
 ## Development
 
