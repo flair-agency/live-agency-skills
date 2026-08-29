@@ -30,6 +30,9 @@ See [Provider architecture](docs/provider-architecture.md).
 - [`creator-invitation-status-sync`](skills/creator-invitation-status-sync/SKILL.md):
   discovers normalized observation providers, maintains transition-based Lark
   history through reviewed plans, and keeps observation-service details private.
+- [`creator-profile-sync`](skills/creator-profile-sync/SKILL.md): exports stable
+  targets, validates normalized profile and live-session observations, appends
+  only new Lark history, and verifies every approved write by rereading.
 - [`creator-profile-compaction`](skills/creator-profile-compaction/SKILL.md):
   retains representative profile observations using stable Lark field IDs and
   requires hash-and-count approval before any deletion.

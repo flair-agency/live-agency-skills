@@ -3,9 +3,10 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const API_PACKAGE_NAME = "@live-agency-skills/source-provider-api";
-export const API_VERSION = "1.0.0";
+export const API_VERSION = "1.1.0";
 export const ACTIVITY_CAPABILITY = "creator-activity-source/v1";
 export const INVITATION_CAPABILITY = "creator-invitation-observation-source/v1";
+export const PROFILE_OBSERVATION_CAPABILITY = "creator-profile-observation-source/v1";
 
 export class ProviderResolutionError extends Error {
   constructor(code, message, details = {}) {
@@ -292,6 +293,125 @@ export function validateInvitationObservations(snapshot) {
       if (typeof creator.avatar.mimeType !== "string" || !creator.avatar.mimeType.startsWith("image/")) {
         throw new TypeError(`invitation creator ${index} avatar.mimeType is invalid`);
       }
+    }
+  }
+  return snapshot;
+}
+
+const PROFILE_METRIC_STATUSES = new Set([
+  "observed_exact",
+  "observed_rounded",
+  "not_available",
+  "no_history",
+  "account_mismatch",
+  "authentication_required",
+  "blocked",
+  "schema_changed",
+]);
+const LIVE_SCAN_MODES = new Set(["incremental", "reconcile-window", "baseline-full"]);
+const LIVE_STOP_REASONS = new Set([
+  "known-anchor",
+  "cutoff",
+  "history-end",
+  "no-history",
+  "unavailable",
+]);
+
+function validateObservedCount({ value, status, display }, label, { rounded = true } = {}) {
+  if (!PROFILE_METRIC_STATUSES.has(status)) {
+    throw new TypeError(`${label} status is invalid`);
+  }
+  if (value === null) {
+    if (["observed_exact", "observed_rounded"].includes(status)) {
+      throw new TypeError(`${label} null value cannot be observed`);
+    }
+    return;
+  }
+  assertNonNegativeInteger(value, `${label} value`);
+  if (status === "observed_exact") return;
+  if (status !== "observed_rounded" || !rounded) {
+    throw new TypeError(`${label} value requires an observed status`);
+  }
+  if (typeof display !== "string" || !display.trim()) {
+    throw new TypeError(`${label} rounded value requires display text`);
+  }
+}
+
+export function validateProfileObservations(snapshot) {
+  assertObject(snapshot, "profile observations");
+  assertIsoDateTime(snapshot.observedAt, "profile observations observedAt");
+  if (!Array.isArray(snapshot.creators)) {
+    throw new TypeError("profile observations creators must be an array");
+  }
+  if (snapshot.rowCount !== snapshot.creators.length) {
+    throw new TypeError("profile observations rowCount must match creators.length");
+  }
+
+  const creatorIds = new Set();
+  const accountKeys = new Set();
+  for (const [index, creator] of snapshot.creators.entries()) {
+    const label = `profile creator ${index}`;
+    assertObject(creator, label);
+    for (const key of ["creatorRecordId", "accountKey"]) {
+      if (typeof creator[key] !== "string" || !creator[key].trim()) {
+        throw new TypeError(`${label} ${key} is required`);
+      }
+    }
+    if (creatorIds.has(creator.creatorRecordId)) {
+      throw new TypeError(`profile creatorRecordId is duplicated: ${creator.creatorRecordId}`);
+    }
+    if (accountKeys.has(creator.accountKey)) {
+      throw new TypeError(`profile accountKey is duplicated: ${creator.accountKey}`);
+    }
+    creatorIds.add(creator.creatorRecordId);
+    accountKeys.add(creator.accountKey);
+    assertIsoDateTime(creator.observedAt, `${label} observedAt`);
+
+    assertObject(creator.profile, `${label} profile`);
+    validateObservedCount(
+      {
+        value: creator.profile.followerCount,
+        status: creator.profile.followerStatus,
+        display: creator.profile.followerDisplay,
+      },
+      `${label} follower`,
+    );
+    validateObservedCount(
+      {
+        value: creator.profile.communityCount,
+        status: creator.profile.communityStatus,
+        display: creator.profile.communityDisplay,
+      },
+      `${label} community`,
+    );
+
+    assertObject(creator.liveScan, `${label} liveScan`);
+    if (!LIVE_SCAN_MODES.has(creator.liveScan.mode)) {
+      throw new TypeError(`${label} liveScan.mode is invalid`);
+    }
+    if (!LIVE_STOP_REASONS.has(creator.liveScan.stopReason)) {
+      throw new TypeError(`${label} liveScan.stopReason is invalid`);
+    }
+    assertNonNegativeInteger(creator.liveScan.knownMatchCount, `${label} liveScan.knownMatchCount`);
+    if (!Array.isArray(creator.lives)) throw new TypeError(`${label} lives must be an array`);
+    const liveKeys = new Set();
+    for (const [liveIndex, live] of creator.lives.entries()) {
+      const liveLabel = `${label} live ${liveIndex}`;
+      assertObject(live, liveLabel);
+      assertIsoDateTime(live.startAt, `${liveLabel} startAt`);
+      assertIsoDateTime(live.endAt, `${liveLabel} endAt`);
+      const startMs = Date.parse(live.startAt);
+      const endMs = Date.parse(live.endAt);
+      if (endMs < startMs || endMs - startMs > 24 * 60 * 60 * 1000) {
+        throw new TypeError(`${liveLabel} duration is invalid`);
+      }
+      const liveKey = `${startMs}:${endMs}`;
+      if (liveKeys.has(liveKey)) throw new TypeError(`${liveLabel} is duplicated`);
+      liveKeys.add(liveKey);
+      validateObservedCount(
+        { value: live.likeCount, status: live.likeStatus, display: live.likeDisplay },
+        `${liveLabel} likes`,
+      );
     }
   }
   return snapshot;
