@@ -2,9 +2,11 @@
 
 ## Boundary
 
-Public skills own validation, matching, dry runs, constrained writes,
-post-write verification, and audit output. They accept normalized data and do
-not know which provider package produced it.
+Public skills own validation, matching, dry runs, content-bound write intents,
+post-write result validation, and audit output. They accept normalized data and
+do not know which provider package produced it. A public skill may perform a
+source-neutral destination write itself or delegate a service-specific write to
+a sink capability without learning the provider package name.
 
 Private providers own source recognition, source-specific parsing or
 observation instructions, schema-change detection, and normalization.
@@ -20,6 +22,9 @@ The first capabilities are:
 - `creator-invitation-observation-source/v1`
 - `creator-profile-observation-source/v1`
 - `gift-history-snapshot-source/v1`
+- `coin-purchase-evidence-source/v1`
+- `expense-candidate-source/v1`
+- `expense-registration-sink/v1`
 
 A provider declares one or more capabilities under `liveAgencyProvider` in its
 `package.json`. It also declares compatible input kinds, execution kind, and
@@ -28,7 +33,7 @@ whether unattended execution is supported.
 ```json
 {
   "peerDependencies": {
-    "@live-agency-skills/source-provider-api": "^1.0.0"
+    "@live-agency-skills/source-provider-api": "^1.3.0"
   },
   "liveAgencyProvider": {
     "schemaVersion": 1,

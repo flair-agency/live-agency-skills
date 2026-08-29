@@ -3,11 +3,14 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const API_PACKAGE_NAME = "@live-agency-skills/source-provider-api";
-export const API_VERSION = "1.2.0";
+export const API_VERSION = "1.3.0";
 export const ACTIVITY_CAPABILITY = "creator-activity-source/v1";
 export const INVITATION_CAPABILITY = "creator-invitation-observation-source/v1";
 export const PROFILE_OBSERVATION_CAPABILITY = "creator-profile-observation-source/v1";
 export const GIFT_HISTORY_CAPABILITY = "gift-history-snapshot-source/v1";
+export const COIN_PURCHASE_EVIDENCE_CAPABILITY = "coin-purchase-evidence-source/v1";
+export const EXPENSE_CANDIDATE_CAPABILITY = "expense-candidate-source/v1";
+export const EXPENSE_REGISTRATION_CAPABILITY = "expense-registration-sink/v1";
 
 export class ProviderResolutionError extends Error {
   constructor(code, message, details = {}) {
@@ -480,6 +483,145 @@ export function validateGiftHistorySnapshot(snapshot) {
       throw new TypeError(`${label} is not strictly ordered by occurredAt and eventKey`);
     }
     previous = ordering;
+  }
+  return snapshot;
+}
+
+function validateCoverage(coverage, label) {
+  assertObject(coverage, label);
+  assertCalendarDate(coverage.fromDate, `${label} fromDate`);
+  assertCalendarDate(coverage.toDate, `${label} toDate`);
+  if (coverage.fromDate > coverage.toDate) throw new TypeError(`${label} date range is reversed`);
+  if (typeof coverage.complete !== "boolean") throw new TypeError(`${label} complete must be boolean`);
+}
+
+function assertPositiveInteger(value, label) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError(`${label} must be a positive safe integer`);
+  }
+}
+
+function assertCanonicalMoney(value, label) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError(`${label} must be a positive JPY safe integer`);
+  }
+}
+
+function compareOrderTuple(left, right) {
+  for (let index = 0; index < left.length; index += 1) {
+    const compared =
+      typeof left[index] === "number" && typeof right[index] === "number"
+        ? left[index] - right[index]
+        : String(left[index]).localeCompare(String(right[index]));
+    if (compared) return compared;
+  }
+  return 0;
+}
+
+function validateReceipt(receipt, label) {
+  assertObject(receipt, label);
+  if (!["verified", "unavailable", "conflict"].includes(receipt.status)) {
+    throw new TypeError(`${label} status is invalid`);
+  }
+  if (receipt.receiptDate !== undefined && receipt.receiptDate !== null) {
+    assertCalendarDate(receipt.receiptDate, `${label} receiptDate`);
+  }
+  if (receipt.status !== "verified") {
+    for (const key of ["filePath", "sha256", "size", "mimeType"]) {
+      if (receipt[key] !== undefined && receipt[key] !== null) {
+        throw new TypeError(`${label} ${key} must be absent unless verified`);
+      }
+    }
+    return;
+  }
+  if (typeof receipt.filePath !== "string" || !path.isAbsolute(receipt.filePath)) {
+    throw new TypeError(`${label} filePath must be absolute`);
+  }
+  if (!/^[0-9a-f]{64}$/.test(receipt.sha256 ?? "")) {
+    throw new TypeError(`${label} sha256 is invalid`);
+  }
+  assertPositiveInteger(receipt.size, `${label} size`);
+  if (
+    typeof receipt.mimeType !== "string" ||
+    !(receipt.mimeType === "application/pdf" || receipt.mimeType.startsWith("image/"))
+  ) {
+    throw new TypeError(`${label} mimeType is invalid`);
+  }
+}
+
+export function validateCoinPurchaseEvidence(snapshot) {
+  assertObject(snapshot, "coin-purchase evidence");
+  if (snapshot.version !== 1) throw new TypeError("coin-purchase evidence version is invalid");
+  assertPlainText(snapshot.serviceKey, "coin-purchase evidence serviceKey");
+  assertPlainText(snapshot.accountKey, "coin-purchase evidence accountKey");
+  assertIsoDateTime(snapshot.observedAt, "coin-purchase evidence observedAt");
+  validateCoverage(snapshot.coverage, "coin-purchase evidence coverage");
+  if (!Array.isArray(snapshot.purchases)) throw new TypeError("coin-purchase evidence purchases must be an array");
+  if (snapshot.rowCount !== snapshot.purchases.length) {
+    throw new TypeError("coin-purchase evidence rowCount must match purchases.length");
+  }
+  const keys = new Set();
+  const transactionIds = new Set();
+  const receiptDigests = new Set();
+  let previousOrder = null;
+  for (const [index, purchase] of snapshot.purchases.entries()) {
+    const label = `coin purchase ${index}`;
+    assertObject(purchase, label);
+    assertPlainText(purchase.purchaseKey, `${label} purchaseKey`);
+    assertCalendarDate(purchase.transactionDate, `${label} transactionDate`);
+    assertCanonicalMoney(purchase.amountJpy, `${label} amountJpy`);
+    assertPositiveInteger(purchase.coinCount, `${label} coinCount`);
+    assertPositiveInteger(purchase.occurrence, `${label} occurrence`);
+    if (purchase.transactionId !== null && purchase.transactionId !== undefined) {
+      assertPlainText(purchase.transactionId, `${label} transactionId`);
+      if (transactionIds.has(purchase.transactionId)) throw new TypeError(`${label} transactionId is duplicated`);
+      transactionIds.add(purchase.transactionId);
+    }
+    validateReceipt(purchase.receipt, `${label} receipt`);
+    if (purchase.receipt.status === "verified") {
+      if (receiptDigests.has(purchase.receipt.sha256)) throw new TypeError(`${label} receipt SHA-256 is reused`);
+      receiptDigests.add(purchase.receipt.sha256);
+    }
+    if (keys.has(purchase.purchaseKey)) throw new TypeError(`${label} purchaseKey is duplicated`);
+    keys.add(purchase.purchaseKey);
+    const order = [purchase.transactionDate, purchase.amountJpy, purchase.occurrence, purchase.purchaseKey];
+    if (previousOrder && compareOrderTuple(order, previousOrder) <= 0) {
+      throw new TypeError(`${label} is not strictly ordered`);
+    }
+    previousOrder = order;
+  }
+  return snapshot;
+}
+
+export function validateExpenseCandidates(snapshot) {
+  assertObject(snapshot, "expense candidates");
+  if (snapshot.version !== 1) throw new TypeError("expense candidates version is invalid");
+  assertPlainText(snapshot.serviceKey, "expense candidates serviceKey");
+  assertPlainText(snapshot.expenseAccountKey, "expense candidates expenseAccountKey");
+  assertIsoDateTime(snapshot.observedAt, "expense candidates observedAt");
+  validateCoverage(snapshot.coverage, "expense candidates coverage");
+  if (!Array.isArray(snapshot.expenses)) throw new TypeError("expense candidates expenses must be an array");
+  if (snapshot.rowCount !== snapshot.expenses.length) {
+    throw new TypeError("expense candidates rowCount must match expenses.length");
+  }
+  const keys = new Set();
+  let previousOrder = null;
+  for (const [index, expense] of snapshot.expenses.entries()) {
+    const label = `expense candidate ${index}`;
+    assertObject(expense, label);
+    for (const key of ["expenseKey", "paymentSourceKey", "registrationProfileKey"]) {
+      assertPlainText(expense[key], `${label} ${key}`);
+    }
+    assertCalendarDate(expense.transactionDate, `${label} transactionDate`);
+    assertCanonicalMoney(expense.amountJpy, `${label} amountJpy`);
+    assertPositiveInteger(expense.occurrence, `${label} occurrence`);
+    if (keys.has(expense.expenseKey)) throw new TypeError(`${label} expenseKey is duplicated`);
+    keys.add(expense.expenseKey);
+    const order = [expense.transactionDate, expense.amountJpy, expense.occurrence, expense.expenseKey];
+    if (previousOrder && compareOrderTuple(order, previousOrder) <= 0) {
+      throw new TypeError(`${label} is not strictly ordered`);
+    }
+    previousOrder = order;
   }
   return snapshot;
 }

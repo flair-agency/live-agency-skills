@@ -1,0 +1,25 @@
+{
+  "name": "@fixture/coin-purchase-instruction-provider",
+  "version": "1.0.0",
+  "private": true,
+  "peerDependencies": {
+    "@live-agency-skills/source-provider-api": "^1.0.0"
+  },
+  "liveAgencyProvider": {
+    "schemaVersion": 1,
+    "provides": [
+      "coin-purchase-evidence-source/v1"
+    ],
+    "inputKinds": [
+      "application/x.synthetic-coin-acquisition+json"
+    ],
+    "unattended": false,
+    "execution": {
+      "kind": "instructions",
+      "resource": "./instructions/provider.md"
+    }
+  },
+  "files": [
+    "instructions/provider.md"
+  ]
+}

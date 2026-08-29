@@ -42,6 +42,9 @@ See [Provider architecture](docs/provider-architecture.md).
 - [`gift-history-sync`](skills/gift-history-sync/SKILL.md): validates normalized
   partial gift snapshots, preserves omitted master events, records recipient
   evidence, and prepares content-bound reviewed commits and projections.
+- [`coin-expense-reconcile`](skills/coin-expense-reconcile/SKILL.md): validates
+  normalized purchase receipts and expense candidates, builds exact one-to-one
+  plans, and verifies only explicitly approved registrations.
 
 Invitation-state compaction remains a separate planned migration because it is
 destructive maintenance and requires a different approval boundary.

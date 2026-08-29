@@ -9,13 +9,15 @@
   ],
   "dependencies": {
     "@fixture/activity-pasted-source": "1.0.0",
+    "@fixture/coin-purchase-instruction-provider": "1.0.0",
+    "@fixture/expense-instruction-provider": "1.0.0",
     "@fixture/gift-history-source": "1.0.0",
     "@fixture/invitation-instruction-source": "1.0.0",
     "@fixture/invitation-observation-source": "1.0.0",
     "@fixture/profile-instruction-source": "1.0.0",
     "@live-agency-skills/lark-base-client": "1.0.0",
     "@live-agency-skills/private-runtime-files": "1.0.0",
-    "@live-agency-skills/source-provider-api": "1.2.0"
+    "@live-agency-skills/source-provider-api": "1.3.0"
   },
   "scripts": {
     "test": "node --test",

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Coin expense reconcile"
+  short_description: "Match coin receipts to reviewed expense candidates"
+  default_prompt: "Use $coin-expense-reconcile to prepare an exact one-to-one dry run for these normalized coin purchases and expense candidates."

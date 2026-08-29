@@ -14,7 +14,7 @@ explicitly completed.
 | Creator live-history compaction | Implemented | Lark/Drive identifiers and archives |
 | Creator profile observation sync | Complete | Service-specific observation provider and Lark configuration |
 | Gift-history reconciliation | Complete | Export acquisition/schema, workbook/Lark identifiers, and account evidence |
-| Coin-expense reconciliation | Under design | Portal acquisition and organization accounting policy |
+| Coin-expense reconciliation | Complete | Purchase evidence, expense candidates, service-specific registration, and organization accounting policy |
 
 ## Private provider candidates
 
@@ -23,7 +23,8 @@ public capability contract and are installed into a local npm composition root.
 
 - creator-profile observation acquisition;
 - gift-history export acquisition and mobile download workflow;
-- coin receipt and expense-system acquisition/policy; and
+- TikTok coin-purchase evidence acquisition and receipt verification;
+- MoneyForward expense candidates, organization accounting policy, and reviewed registration; and
 - any service-specific schema, URL, screen, or authenticated workflow.
 
 ## Excluded or superseded

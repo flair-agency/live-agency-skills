@@ -1,0 +1,27 @@
+{
+  "name": "@fixture/expense-instruction-provider",
+  "version": "1.0.0",
+  "private": true,
+  "peerDependencies": {
+    "@live-agency-skills/source-provider-api": "^1.0.0"
+  },
+  "liveAgencyProvider": {
+    "schemaVersion": 1,
+    "provides": [
+      "expense-candidate-source/v1",
+      "expense-registration-sink/v1"
+    ],
+    "inputKinds": [
+      "application/x.synthetic-expense-candidates+json",
+      "application/x.synthetic-expense-registration+json"
+    ],
+    "unattended": false,
+    "execution": {
+      "kind": "instructions",
+      "resource": "./instructions/provider.md"
+    }
+  },
+  "files": [
+    "instructions/provider.md"
+  ]
+}
