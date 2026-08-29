@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -12,6 +11,10 @@ import {
   resolveProvider,
   validateInvitationObservations,
 } from "@live-agency-skills/source-provider-api";
+import {
+  readPrivateJson,
+  writePrivateJson,
+} from "@live-agency-skills/private-runtime-files";
 
 export function parseArgs(argv) {
   const args = { unattended: false };
@@ -32,7 +35,7 @@ export function parseArgs(argv) {
 }
 
 export async function resolveInvitationSource(args) {
-  const request = JSON.parse(await readFile(path.resolve(args.request), "utf8"));
+  const request = await readPrivateJson(path.resolve(args.request));
   const providers = await discoverProviders({ rootDir: path.resolve(args.providerRoot) });
   const provider = await resolveProvider({
     providers,
@@ -49,10 +52,7 @@ export async function resolveInvitationSource(args) {
     };
   }
   const observations = validateInvitationObservations(await readFromProvider(provider, request));
-  await writeFile(path.resolve(args.output), `${JSON.stringify(observations, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
+  await writePrivateJson(path.resolve(args.output), observations);
   return {
     status: "normalized",
     providerPackage: provider.packageName,

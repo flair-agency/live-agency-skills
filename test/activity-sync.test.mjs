@@ -147,7 +147,7 @@ test("resolves a raw request through npm and writes a normalized private output"
         sourceUpdatedAt: "2030-01-02T03:04:05.000Z",
         text: "synthetic input",
       }),
-      "utf8",
+      { encoding: "utf8", mode: 0o600 },
     );
     const result = await resolveActivitySource({
       providerRoot: repositoryRoot,

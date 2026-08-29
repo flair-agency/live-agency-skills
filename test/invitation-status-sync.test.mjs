@@ -173,7 +173,7 @@ test("resolves an unattended synthetic provider through npm", async () => {
         observedAt: "2030-01-02T03:04:05.000Z",
         targets: [{ accountKey: "synthetic.creator" }],
       }),
-      "utf8",
+      { encoding: "utf8", mode: 0o600 },
     );
     const result = await resolveInvitationSource({
       providerRoot: repositoryRoot,

@@ -6,6 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { validateActivitySnapshot } from "@live-agency-skills/source-provider-api";
+import { readPrivateJson } from "@live-agency-skills/private-runtime-files";
 
 const DEFAULT_API_ORIGIN = "https://open.larksuite.com";
 const MAX_BATCH_SIZE = 200;
@@ -87,7 +88,7 @@ export function normalizeSnapshot(raw, monthOverride) {
 export async function loadSnapshot(filePath, monthOverride) {
   let raw;
   try {
-    raw = JSON.parse(await readFile(path.resolve(filePath), "utf8"));
+    raw = await readPrivateJson(path.resolve(filePath));
   } catch (error) {
     throw new SyncError(`cannot read normalized input JSON: ${error.message}`);
   }

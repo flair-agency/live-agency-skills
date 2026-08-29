@@ -1,0 +1,11 @@
+{
+  "name": "@live-agency-skills/private-runtime-files",
+  "version": "1.0.0",
+  "description": "Owner-only atomic runtime files for live agency skills",
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": [
+    "src"
+  ],
+  "license": "MIT"
+}

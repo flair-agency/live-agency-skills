@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { LARK_MEDIA_MAX_BYTES } from "@live-agency-skills/lark-base-client";
+import { writePrivateJson } from "@live-agency-skills/private-runtime-files";
 
 import {
   buildRefreshPlan,
@@ -15,15 +16,7 @@ export function sha256Json(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-export async function writePrivateJson(filePath, value) {
-  const resolved = path.resolve(filePath);
-  await mkdir(path.dirname(resolved), { recursive: true, mode: 0o700 });
-  await writeFile(resolved, `${JSON.stringify(value, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  return resolved;
-}
+export { writePrivateJson };
 
 export async function loadInvitationConfig(filePath) {
   let config;

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { LarkBaseClient } from "@live-agency-skills/lark-base-client";
+import { readPrivateJson } from "@live-agency-skills/private-runtime-files";
 
 import {
   applyRefresh,
@@ -16,7 +16,7 @@ import {
 
 async function readJson(filePath, label) {
   try {
-    return JSON.parse(await readFile(path.resolve(filePath), "utf8"));
+    return await readPrivateJson(path.resolve(filePath));
   } catch (error) {
     throw new TypeError(`cannot read ${label}: ${error.message}`);
   }
