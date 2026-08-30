@@ -41,6 +41,15 @@ The former capability-specific provider repositories are retained only until
 the new provider repositories are installed and verified. They must not receive
 new provider knowledge after cutover.
 
+## Required ongoing maintenance
+
+Provider migration does not end provider maintenance. External sites, apps,
+exports, APIs, and authenticated flows are expected to change. Every provider
+must continuously maintain versioned interface knowledge, stop on unrecognized
+drift, update synthetic tests with each reviewed profile change, and pass the
+private composition-root checks before the new knowledge is used. This is a
+required operating responsibility, not an optional improvement.
+
 ## Excluded or superseded
 
 The legacy activity-incentive and invitation-status skills are superseded by

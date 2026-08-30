@@ -108,6 +108,35 @@ screenshots, cookies, tokens, credentials, signed URLs, or exported records.
 Tests use only synthetic accounts and values. Raw evidence stays owner-only
 outside Git and may be referenced by a private hash or evidence ID.
 
+## Mandatory knowledge lifecycle
+
+Interface drift is a normal operating condition for every provider, not an
+exceptional incident. Provider knowledge is therefore a maintained production
+dependency. A provider is not complete merely because its implementation works
+at the time it is first migrated.
+
+Every production binding must declare a knowledge version. A provider without
+capability bindings must declare an equivalent provider-knowledge version in
+its package metadata. Every run must compare the observed interface, schema,
+environment variant, and stopping evidence with the selected knowledge
+profile. A version date alone never proves that the profile is current.
+
+When an interface or schema does not match exactly:
+
+1. stop with `schema_changed` or the provider's equivalent fail-closed result;
+2. retain only the minimum owner-only evidence needed to review the drift,
+   including observation time and relevant environment variants;
+3. update implementation and provider knowledge together in the private
+   provider repository, using a new knowledge version rather than silently
+   reinterpreting previous audit records;
+4. add or update synthetic tests without committing production data or raw
+   evidence; and
+5. update the reviewed provider commit in the private composition root and run
+   its complete compatibility checks before resuming production use.
+
+An ad hoc local workaround, a nearby older profile, or a visually similar
+screen is not an acceptable substitute for this lifecycle.
+
 ## Fail-closed rules
 
 Resolution stops before any destination write when:
