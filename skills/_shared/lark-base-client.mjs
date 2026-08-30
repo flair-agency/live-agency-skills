@@ -1,6 +1,7 @@
 export const LARK_MEDIA_MAX_BYTES = 20 * 1024 * 1024;
 
-export async function createLarkBaseClient(options) {
+export async function createLarkBaseClient(options = {}) {
+  const { keychainService, env = process.env, ...clientOptions } = options;
   let provider;
   try {
     provider = await import("@live-agency-skills/lark-base-client");
@@ -16,5 +17,9 @@ export async function createLarkBaseClient(options) {
   if (typeof provider.LarkBaseClient?.fromEnvironment !== "function") {
     throw new TypeError("installed Lark Base provider is incompatible");
   }
-  return provider.LarkBaseClient.fromEnvironment(options);
+  const selectedService = env.LARK_KEYCHAIN_SERVICE?.trim() || keychainService?.trim();
+  const effectiveEnv = selectedService
+    ? { ...env, LARK_KEYCHAIN_SERVICE: selectedService }
+    : env;
+  return provider.LarkBaseClient.fromEnvironment({ ...clientOptions, env: effectiveEnv });
 }

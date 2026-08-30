@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
+import { isMainModule } from "../../_shared/is-main.mjs";
+
 import crypto from "node:crypto";
 import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 
 import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
@@ -150,6 +151,9 @@ export async function loadConfig(filePath) {
         ? destination.mimeType.trim()
         : "application/gzip",
     },
+    credentials: typeof raw.credentials?.larkKeychainService === "string" && raw.credentials.larkKeychainService.trim()
+      ? { larkKeychainService: raw.credentials.larkKeychainService.trim() }
+      : {},
     apiOrigin: typeof raw.apiOrigin === "string" && raw.apiOrigin.trim()
       ? raw.apiOrigin.trim()
       : "https://open.larksuite.com",
@@ -525,7 +529,7 @@ async function readPrivateGzipJson(filename) {
 }
 
 async function currentRuntime(config, client) {
-  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin, keychainService: config.credentials?.larkKeychainService });
   const fields = await activeClient.listFields(config.appToken, config.tableId);
   const schema = resolveSchema(fields, config);
   const records = await activeClient.listRecords(config.appToken, config.tableId);
@@ -617,7 +621,7 @@ export async function createReceipt({ plan, archivePath, config, output, fileMet
 }
 
 export async function applyPlan({ plan, receipt, config, apply = false, expectSha256, confirmDelete, client }) {
-  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin, keychainService: config.credentials?.larkKeychainService });
   const dryRun = await inspectPlan({ plan, config, client: activeClient });
   if (!apply) return dryRun;
   assert(dryRun.status !== "blocked", "a blocked or stale plan cannot be applied");
@@ -857,7 +861,7 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+const isMain = isMainModule(import.meta.url);
 if (isMain) {
   main().catch((error) => {
     console.error(JSON.stringify({ status: "error", message: error.message }, null, 2));

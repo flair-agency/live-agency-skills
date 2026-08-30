@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
+import { isMainModule } from "../../_shared/is-main.mjs";
+
 import crypto from "node:crypto";
 import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 
 import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
@@ -111,7 +112,7 @@ function attachmentResolver(client, backupDirectory = null) {
 }
 
 async function currentRuntime(config, { client = null, backupDirectory = null } = {}) {
-  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin, keychainService: config.credentials?.larkKeychainService });
   const [creatorFields, stateFields] = await Promise.all([
     activeClient.listFields(config.appToken, config.creatorTableId),
     activeClient.listFields(config.appToken, config.invitationStateTableId),
@@ -401,7 +402,7 @@ export async function createInvitationArchiveReceipt({ plan, archivePath, config
 }
 
 export async function applyInvitationCompaction({ plan, receipt, config, apply = false, expectSha256, confirmDelete, client }) {
-  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin, keychainService: config.credentials?.larkKeychainService });
   const dryRun = await inspectInvitationCompactionPlan({ plan, config, client: activeClient });
   if (!apply) return dryRun;
   assert(dryRun.status !== "blocked", "blocked or stale plan cannot be applied");
@@ -695,7 +696,7 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+const isMain = isMainModule(import.meta.url);
 if (isMain) main().catch((error) => {
   console.error(JSON.stringify({ status: "stopped", message: error.message }));
   process.exitCode = 1;

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
+import { isMainModule } from "../../_shared/is-main.mjs";
+
 import crypto from "node:crypto";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
 import { readPrivateJson, writePrivateJson } from "@live-agency-skills/private-runtime-files";
@@ -92,6 +93,9 @@ export async function loadConfig(filePath) {
     creatorTableId: raw.creatorTableId.trim(),
     tableId: raw.tableId.trim(),
     fieldIds: Object.fromEntries(fieldKeys.map((key, index) => [key, values[index]])),
+    credentials: typeof raw.credentials?.larkKeychainService === "string" && raw.credentials.larkKeychainService.trim()
+      ? { larkKeychainService: raw.credentials.larkKeychainService.trim() }
+      : {},
     apiOrigin: typeof raw.apiOrigin === "string" && raw.apiOrigin.trim()
       ? raw.apiOrigin.trim()
       : "https://open.larksuite.com",
@@ -362,7 +366,7 @@ export function validatePlan(plan, config) {
 }
 
 async function runtime(config, client) {
-  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin, keychainService: config.credentials?.larkKeychainService });
   const fields = await activeClient.listFields(config.appToken, config.tableId);
   const bindings = resolveFields(fields, config.fieldIds, config.creatorTableId);
   const records = await activeClient.listRecords(config.appToken, config.tableId);
@@ -404,7 +408,7 @@ export async function inspectPlan({ plan, config, client }) {
 }
 
 export async function applyPlan({ plan, config, apply = false, expectSha256, confirmDelete, client }) {
-  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin, keychainService: config.credentials?.larkKeychainService });
   const dryRun = await inspectPlan({ plan, config, client: activeClient });
   if (!apply) return dryRun;
   assert(dryRun.status !== "blocked", "malformed or stale records block deletion");
@@ -501,7 +505,7 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+const isMain = isMainModule(import.meta.url);
 if (isMain) {
   main().catch((error) => {
     console.error(JSON.stringify({ status: "error", message: error.message }, null, 2));

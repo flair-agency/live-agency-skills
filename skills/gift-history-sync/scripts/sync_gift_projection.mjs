@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
+import { isMainModule } from "../../_shared/is-main.mjs";
+
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
 import { readPrivateJson, writePrivateJson } from "@live-agency-skills/private-runtime-files";
@@ -158,6 +159,6 @@ export async function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url)) {
   process.exitCode = await main();
 }

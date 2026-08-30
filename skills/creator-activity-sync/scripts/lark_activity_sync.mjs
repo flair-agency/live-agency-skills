@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
+import { isMainModule } from "../../_shared/is-main.mjs";
+
 import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { validateActivitySnapshot } from "@live-agency-skills/source-provider-api";
 import { readPrivateJson } from "@live-agency-skills/private-runtime-files";
@@ -126,6 +127,9 @@ export async function loadConfig(filePath) {
     appToken: config.appToken,
     tableId: config.tableId,
     fieldIds: Object.fromEntries(keys.map((key, index) => [key, values[index]])),
+    credentials: typeof config.credentials?.larkKeychainService === "string" && config.credentials.larkKeychainService.trim()
+      ? { larkKeychainService: config.credentials.larkKeychainService.trim() }
+      : {},
     apiOrigin: config.apiOrigin ?? DEFAULT_API_ORIGIN,
   };
 }
@@ -472,7 +476,15 @@ export class LarkClient {
 }
 
 export async function runSync({ snapshot, config, apply = false, client }) {
-  const activeClient = client ?? (await LarkClient.fromEnvironment({ origin: config.apiOrigin }));
+  const selectedService = process.env.LARK_KEYCHAIN_SERVICE?.trim()
+    || config.credentials?.larkKeychainService;
+  const credentialEnv = selectedService
+    ? { ...process.env, LARK_KEYCHAIN_SERVICE: selectedService }
+    : process.env;
+  const activeClient = client ?? (await LarkClient.fromEnvironment({
+    origin: config.apiOrigin,
+    env: credentialEnv,
+  }));
   const bindings = resolveFields(await activeClient.listFields(config.appToken, config.tableId), config.fieldIds);
   const plan = buildPlan(
     await activeClient.listRecords(config.appToken, config.tableId),
@@ -562,6 +574,6 @@ export async function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url)) {
   process.exitCode = await main();
 }

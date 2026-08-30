@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
+import { isMainModule } from "../../_shared/is-main.mjs";
+
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   ACTIVITY_CAPABILITY,
@@ -82,6 +83,6 @@ export async function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url)) {
   process.exitCode = await main();
 }

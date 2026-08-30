@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
+import { isMainModule } from "../../_shared/is-main.mjs";
+
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
 
@@ -35,7 +36,7 @@ export async function main(argv = process.argv.slice(2)) {
   try {
     const args = parseArgs(argv);
     const config = await loadInvitationConfig(args.config);
-    const client = await createLarkBaseClient({ origin: config.apiOrigin });
+    const client = await createLarkBaseClient({ origin: config.apiOrigin, keychainService: config.credentials?.larkKeychainService });
     const manifest = await exportTargets({
       client,
       config,
@@ -60,6 +61,6 @@ export async function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMainModule(import.meta.url)) {
   process.exitCode = await main();
 }

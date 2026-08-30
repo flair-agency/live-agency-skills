@@ -65,6 +65,9 @@ export async function loadInsightConfig(filePath) {
     tagTableId: raw.tagTableId.trim(),
     insightViewId: raw.insightViewId.trim(),
     fieldIds: Object.fromEntries(keys.map((key, index) => [key, values[index]])),
+    credentials: typeof raw.credentials?.larkKeychainService === "string" && raw.credentials.larkKeychainService.trim()
+      ? { larkKeychainService: raw.credentials.larkKeychainService.trim() }
+      : {},
     apiOrigin: typeof raw.apiOrigin === "string" && raw.apiOrigin.trim()
       ? raw.apiOrigin.trim()
       : "https://open.larksuite.com",
