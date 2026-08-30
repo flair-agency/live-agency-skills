@@ -14,6 +14,10 @@ import {
   validateGiftHistoryPlan,
 } from "../skills/gift-history-sync/scripts/gift_history_core.mjs";
 import {
+  GIFT_PLAN_MAX_BYTES,
+  readGiftCommitInputs,
+} from "../skills/gift-history-sync/scripts/prepare_gift_commit.mjs";
+import {
   buildProjectionPlan,
   buildProjectionTarget,
   projectionPayload,
@@ -200,6 +204,35 @@ test("replaying against a changed master detects a stale reviewed plan", () => {
     reviewedPlan: reviewed,
   });
   assert.notEqual(replayed.planSha256, reviewed.planSha256);
+});
+
+test("commit preparation reads a bounded plan larger than the generic private-file limit", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "gift-commit-input-test-"));
+  try {
+    const planPath = path.join(directory, "plan.json");
+    const masterPath = path.join(directory, "master.json");
+    const paddingSize = 17 * 1024 * 1024;
+    await writeFile(
+      planPath,
+      JSON.stringify({ synthetic: true, padding: "x".repeat(paddingSize) }),
+      { encoding: "utf8", mode: 0o600 },
+    );
+    await writeFile(
+      masterPath,
+      JSON.stringify({ version: 1, events: [], syncLog: [] }),
+      { encoding: "utf8", mode: 0o600 },
+    );
+
+    const [planInput, masterInput] = await readGiftCommitInputs({
+      planPath,
+      currentMasterPath: masterPath,
+    });
+    assert.ok(GIFT_PLAN_MAX_BYTES > paddingSize);
+    assert.equal(planInput.padding.length, paddingSize);
+    assert.deepEqual(masterInput, { version: 1, events: [], syncLog: [] });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("discovers and executes a normalized gift source through npm", async () => {

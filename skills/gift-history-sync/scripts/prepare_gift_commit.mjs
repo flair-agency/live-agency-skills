@@ -11,6 +11,15 @@ import {
   validateGiftHistoryPlan,
 } from "./gift_history_core.mjs";
 
+export const GIFT_PLAN_MAX_BYTES = 64 * 1024 * 1024;
+
+export function readGiftCommitInputs({ planPath, currentMasterPath }) {
+  return Promise.all([
+    readPrivateJson(path.resolve(planPath), { maxBytes: GIFT_PLAN_MAX_BYTES }),
+    readPrivateJson(path.resolve(currentMasterPath)),
+  ]);
+}
+
 export function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -47,10 +56,10 @@ export function parseArgs(argv) {
 export async function main(argv = process.argv.slice(2)) {
   try {
     const args = parseArgs(argv);
-    const [reviewedPlan, currentMaster] = await Promise.all([
-      readPrivateJson(path.resolve(args.plan)),
-      readPrivateJson(path.resolve(args.currentMaster)),
-    ]);
+    const [reviewedPlan, currentMaster] = await readGiftCommitInputs({
+      planPath: args.plan,
+      currentMasterPath: args.currentMaster,
+    });
     validateGiftHistoryPlan(reviewedPlan);
     const currentPlan = replayGiftHistoryPlan({ master: currentMaster, reviewedPlan });
     if (currentPlan.planSha256 !== reviewedPlan.planSha256) {
