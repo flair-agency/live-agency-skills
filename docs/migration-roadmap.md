@@ -25,7 +25,9 @@ explicitly completed.
 Private providers are independently versioned by external execution surface.
 Each repository keeps implementation and source-specific knowledge together,
 implements public capability bindings, and is installed into a local npm
-composition root.
+composition root. The canonical composition root is the private
+`live-agency-provider-runtime` repository, which pins reviewed revisions of
+this repository and every provider repository.
 
 | Repository | Migrated responsibilities |
 | --- | --- |

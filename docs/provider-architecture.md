@@ -74,9 +74,11 @@ stable binding ID for each surface:
 }
 ```
 
-The consuming composition root lists the installed provider as a direct npm
-dependency. The skill asks for a capability and an input kind. It does not
-contain a package-name allowlist or provider selection table.
+The private `live-agency-provider-runtime` repository is the canonical
+composition root. It pins this repository and each private provider repository
+at reviewed commits, and lists their packages as direct npm dependencies. The
+skill asks for a capability and an input kind. It does not contain a
+package-name allowlist or provider selection table.
 
 ## Execution kinds
 
@@ -120,6 +122,8 @@ Resolution stops before any destination write when:
 ## Installation model
 
 npm owns package installation, versions, integrity metadata, and the dependency
-graph. The composition root installs provider repositories as direct private
-dependencies. Skills request a capability and input kind; provider repository
-names and binding IDs are not copied into skill routing tables.
+graph. The private `live-agency-provider-runtime` composition root installs the
+public packages and private provider repositories as npm workspaces pinned by
+Git submodules. Its absolute path is supplied to skill commands as
+`--provider-root`. Skills request a capability and input kind; provider
+repository names and binding IDs are not copied into skill routing tables.
