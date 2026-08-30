@@ -8,7 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 
-import { LarkBaseClient } from "@live-agency-skills/lark-base-client";
+import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
 import { readPrivateJson, writePrivateJson } from "@live-agency-skills/private-runtime-files";
 import {
   loadInvitationConfig,
@@ -111,7 +111,7 @@ function attachmentResolver(client, backupDirectory = null) {
 }
 
 async function currentRuntime(config, { client = null, backupDirectory = null } = {}) {
-  const activeClient = client ?? await LarkBaseClient.fromEnvironment({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
   const [creatorFields, stateFields] = await Promise.all([
     activeClient.listFields(config.appToken, config.creatorTableId),
     activeClient.listFields(config.appToken, config.invitationStateTableId),
@@ -401,7 +401,7 @@ export async function createInvitationArchiveReceipt({ plan, archivePath, config
 }
 
 export async function applyInvitationCompaction({ plan, receipt, config, apply = false, expectSha256, confirmDelete, client }) {
-  const activeClient = client ?? await LarkBaseClient.fromEnvironment({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
   const dryRun = await inspectInvitationCompactionPlan({ plan, config, client: activeClient });
   if (!apply) return dryRun;
   assert(dryRun.status !== "blocked", "blocked or stale plan cannot be applied");

@@ -3,7 +3,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { LarkBaseClient } from "@live-agency-skills/lark-base-client";
+import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
 
 import {
   exportLiveHistoryTargets,
@@ -35,7 +35,7 @@ export async function main(argv = process.argv.slice(2)) {
   try {
     const args = parseArgs(argv);
     const config = await loadLiveHistoryConfig(args.config);
-    const client = await LarkBaseClient.fromEnvironment({ origin: config.apiOrigin });
+    const client = await createLarkBaseClient({ origin: config.apiOrigin });
     const manifest = await exportLiveHistoryTargets({
       client,
       config,

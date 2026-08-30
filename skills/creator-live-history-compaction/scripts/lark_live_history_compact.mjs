@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 
-import { LarkBaseClient } from "@live-agency-skills/lark-base-client";
+import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
 import { readPrivateJson, writePrivateJson } from "@live-agency-skills/private-runtime-files";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -525,7 +525,7 @@ async function readPrivateGzipJson(filename) {
 }
 
 async function currentRuntime(config, client) {
-  const activeClient = client ?? await LarkBaseClient.fromEnvironment({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
   const fields = await activeClient.listFields(config.appToken, config.tableId);
   const schema = resolveSchema(fields, config);
   const records = await activeClient.listRecords(config.appToken, config.tableId);
@@ -617,7 +617,7 @@ export async function createReceipt({ plan, archivePath, config, output, fileMet
 }
 
 export async function applyPlan({ plan, receipt, config, apply = false, expectSha256, confirmDelete, client }) {
-  const activeClient = client ?? await LarkBaseClient.fromEnvironment({ origin: config.apiOrigin });
+  const activeClient = client ?? await createLarkBaseClient({ origin: config.apiOrigin });
   const dryRun = await inspectPlan({ plan, config, client: activeClient });
   if (!apply) return dryRun;
   assert(dryRun.status !== "blocked", "a blocked or stale plan cannot be applied");

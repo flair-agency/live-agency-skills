@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { LarkBaseClient } from "@live-agency-skills/lark-base-client";
+import { createLarkBaseClient } from "../../_shared/lark-base-client.mjs";
 import { readPrivateJson, writePrivateJson } from "@live-agency-skills/private-runtime-files";
 
 import {
@@ -118,7 +118,7 @@ export async function run(argv = process.argv.slice(2), { client } = {}) {
   const workspace = await readPrivateJson(path.resolve(args.config));
   const config = validateProjectionConfig(workspace, args.projection);
   const target = normalizeProjectionTarget(await readPrivateJson(path.resolve(args.target)), config);
-  const lark = client ?? await LarkBaseClient.fromEnvironment({
+  const lark = client ?? await createLarkBaseClient({
     env: {
       ...process.env,
       LARK_KEYCHAIN_SERVICE:

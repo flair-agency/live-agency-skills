@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { LARK_MEDIA_MAX_BYTES } from "@live-agency-skills/lark-base-client";
+import { LARK_MEDIA_MAX_BYTES } from "../../_shared/lark-base-client.mjs";
 import { writePrivateJson } from "@live-agency-skills/private-runtime-files";
 
 import {
