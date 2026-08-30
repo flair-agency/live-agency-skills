@@ -6,21 +6,26 @@ runtime directory. The file must be a regular, owner-only (`0600`) file.
 ```json
 {
   "appToken": "local-app-token",
+  "creatorTableId": "local-creator-table-id",
   "tableId": "local-profile-history-table-id",
   "fieldIds": {
     "timestamp": "field-id",
     "creator": "field-id",
     "followerCount": "field-id",
-    "communityCount": "field-id"
+    "recentPostCount30d": "field-id",
+    "latestPostAt": "field-id",
+    "nickname": "field-id",
+    "avatar": "field-id",
+    "featureObservationData": "field-id"
   }
 }
 ```
 
-All four field IDs must be present and distinct. `followerCount` and
-`communityCount` must resolve to numeric fields. Display names are intentionally
-absent because they can be renamed without changing field identity.
+All field IDs must be present and distinct. `creator` must be a single relation
+to `creatorTableId`. Counts must be numeric, timestamps must be date-time,
+nickname and feature-observation data must be text, and avatar must be an
+attachment. Display names are absent because they can be renamed without
+changing identity.
 
-The configuration contains destination identifiers, not credentials. Supply
-credentials through environment variables or an explicitly selected macOS
-keychain item. Do not commit the configuration, a generated plan, or real Lark
-records.
+The configuration contains destination identifiers, not credentials. Never
+commit it, generated plans, or real Lark records.

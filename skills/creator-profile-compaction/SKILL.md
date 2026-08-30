@@ -6,14 +6,20 @@ description: Safely compact creator profile observation history in Lark Base whi
 # Compact creator profile history
 
 Reduce an existing Lark Base observation history without synthesizing data.
-This skill is source-neutral: it does not know which service supplied follower
-or community counts, and it does not acquire new observations.
+This skill is source-neutral: it does not know which service supplied follower,
+post, nickname, avatar, or feature-observation values, and it does not acquire
+new observations.
+
+For every Lark Base read or mutation, follow the policy supplied by the
+installed Lark Base provider.
+The exact-approval and destructive-workflow rules below always take precedence;
+import never substitutes for deletion.
 
 ## Destination configuration
 
 Require a private local configuration described in
 [references/lark-config.md](references/lark-config.md). Identify the Base,
-table, and four fields by stable IDs. Resolve current display names from those
+table and profile fields by stable IDs. Resolve current display names from those
 IDs at runtime. Never treat a display name as field identity.
 
 Use `LARK_TENANT_ACCESS_TOKEN`, or `LARK_APP_ID` with `LARK_APP_SECRET`. A
@@ -30,9 +36,10 @@ the oldest and latest measured record, then retain:
 - a representative per calendar month from 30 through 364 days old; and
 - a representative per calendar year from 365 days onward.
 
-The representative is the latest measured record in the bucket. If it lacks
-one metric, also retain the latest record in that bucket that contains that
-metric. Do not create averages, totals, or replacement records.
+The representative is the latest measured record in the bucket. If it lacks a
+follower, recent-post, latest-post, nickname, avatar, or feature-observation
+value, also retain the latest record in that bucket that contains the missing
+value. Do not create averages, totals, or replacement records.
 
 ## Safe workflow
 

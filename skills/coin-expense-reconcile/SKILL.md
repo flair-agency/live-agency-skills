@@ -44,9 +44,17 @@ duplicate group matches by stable occurrence order only when counts are equal,
 every receipt is verified, and every expense has the same registration profile
 and payment-source class. Otherwise the whole group remains ambiguous.
 
-Report plan SHA-256, exact-match count and JPY total, unmatched counts,
-ambiguous groups, receipt issues, and coverage blockers. Do not expose receipt
-paths or account identifiers in the summary.
+Before date/amount matching, require the expense input to prove that its
+existing-registration lookup covered the exact set of purchase transaction IDs
+in scope. Reserve a purchase when one destination-verified existing
+registration names that exact transaction ID. A row being absent from the
+unregistered-candidate list is never evidence that it was registered. Missing
+transaction IDs, incomplete lookup coverage, unknown lookup IDs, or duplicate
+registration evidence are blocking issues.
+
+Report plan SHA-256, exact-match count and JPY total, already-registered count,
+unmatched counts, ambiguous groups, receipt issues, and coverage blockers. Do
+not expose receipt paths or account identifiers in the summary.
 
 ## Registration boundary
 

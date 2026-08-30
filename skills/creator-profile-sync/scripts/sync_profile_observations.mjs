@@ -27,7 +27,7 @@ export function parseArgs(argv) {
       "--plan",
       "--expect-sha256",
       "--confirm-profile-create",
-      "--confirm-live-create",
+      "--confirm-profile-attach",
     ].includes(value)) {
       const next = argv[index + 1];
       if (!next) throw new TypeError(`${value} requires a value`);
@@ -76,7 +76,7 @@ export async function main(argv = process.argv.slice(2)) {
       apply: args.apply,
       expectSha256: args.expectSha256,
       confirmProfileCreate: args.confirmProfileCreate,
-      confirmLiveCreate: args.confirmLiveCreate,
+      confirmProfileAttach: args.confirmProfileAttach,
     });
     console.log(JSON.stringify(result));
     return result.status === "blocked" ? 4 : 0;

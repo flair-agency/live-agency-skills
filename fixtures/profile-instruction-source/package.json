@@ -8,7 +8,7 @@
   "liveAgencyProvider": {
     "schemaVersion": 1,
     "provides": [
-      "creator-profile-observation-source/v1"
+      "creator-profile-observation-source/v2"
     ],
     "inputKinds": [
       "application/vnd.live-agency.creator-profile-targets+json"

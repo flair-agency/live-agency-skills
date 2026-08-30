@@ -67,7 +67,7 @@ function compactFormula(value) {
 }
 
 function isRecordId(value) {
-  return /^rec[A-Za-z0-9]{8,}$/.test(String(value ?? ""));
+  return /^rec[A-Za-z0-9]{7,}$/.test(String(value ?? ""));
 }
 
 function linkedRecordIds(value) {

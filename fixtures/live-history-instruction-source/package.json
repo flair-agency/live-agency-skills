@@ -1,0 +1,22 @@
+{
+  "name": "@fixture/live-history-instruction-source",
+  "version": "1.0.0",
+  "private": true,
+  "peerDependencies": {
+    "@live-agency-skills/source-provider-api": "^1.4.0"
+  },
+  "liveAgencyProvider": {
+    "schemaVersion": 1,
+    "provides": [
+      "creator-live-history-observation-source/v1"
+    ],
+    "inputKinds": [
+      "application/vnd.live-agency.creator-live-history-targets+json"
+    ],
+    "unattended": false,
+    "execution": {
+      "kind": "instructions",
+      "resource": "./instructions/provider.md"
+    }
+  }
+}

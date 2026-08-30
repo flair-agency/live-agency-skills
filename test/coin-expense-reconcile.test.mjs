@@ -27,6 +27,10 @@ function digest(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function jsonDigest(value) {
+  return digest(JSON.stringify(value));
+}
+
 function purchase(overrides = {}) {
   return {
     purchaseKey: "purchase-1",
@@ -74,16 +78,29 @@ function expense(overrides = {}) {
 }
 
 function expenseCandidates(overrides = {}) {
-  const expenses = overrides.expenses ?? [expense()];
+  const {
+    expenses = [expense()],
+    sourceTransactionIds = ["transaction-1"],
+    existingRegistrations = [],
+    ...snapshotOverrides
+  } = overrides;
+  const sortedTransactionIds = [...sourceTransactionIds].sort();
   return {
     version: 1,
     serviceKey: "synthetic-coin-service",
     expenseAccountKey: "synthetic-expense-account",
     observedAt: "2030-01-04T00:01:00.000Z",
     coverage: { fromDate: "2030-01-01", toDate: "2030-01-03", complete: true },
+    registrationLookup: {
+      complete: true,
+      sourceTransactionIdCount: sortedTransactionIds.length,
+      sourceTransactionIdsSha256: jsonDigest(sortedTransactionIds),
+    },
+    existingRegistrationCount: existingRegistrations.length,
+    existingRegistrations,
     rowCount: expenses.length,
     expenses,
-    ...overrides,
+    ...snapshotOverrides,
   };
 }
 
@@ -141,7 +158,7 @@ test("pairs only equivalent duplicate multisets and blocks differing profiles", 
   ];
   const matched = buildCoinExpensePlan({
     purchaseEvidence: purchaseEvidence({ purchases }),
-    expenseCandidates: expenseCandidates({ expenses }),
+    expenseCandidates: expenseCandidates({ expenses, sourceTransactionIds: ["transaction-1", "transaction-2"] }),
     nowMs: NOW,
   });
   assert.equal(matched.summary.exactMatchCount, 2);
@@ -152,12 +169,60 @@ test("pairs only equivalent duplicate multisets and blocks differing profiles", 
     expenseCandidates: expenseCandidates({ expenses: [
       expense(),
       expense({ expenseKey: "expense-2", occurrence: 2, registrationProfileKey: "different-profile" }),
-    ] }),
+    ], sourceTransactionIds: ["transaction-1", "transaction-2"] }),
     nowMs: NOW,
   });
   assert.equal(ambiguous.summary.exactMatchCount, 0);
   assert.equal(ambiguous.summary.ambiguousGroupCount, 1);
   assert.deepEqual(ambiguous.operations.ambiguousGroups[0].reasons, ["registration_profiles_differ"]);
+});
+
+test("reserves a destination-verified existing registration before date and amount matching", () => {
+  const purchases = [
+    purchase({ receipt: { status: "unavailable" } }),
+    purchase({
+      purchaseKey: "purchase-2",
+      transactionId: "transaction-2",
+      occurrence: 2,
+      receipt: {
+        ...purchase().receipt,
+        filePath: "/private/tmp/synthetic-receipt-2.pdf",
+        sha256: digest("receipt-2"),
+      },
+    }),
+  ];
+  const plan = buildCoinExpensePlan({
+    purchaseEvidence: purchaseEvidence({ purchases }),
+    expenseCandidates: expenseCandidates({
+      sourceTransactionIds: ["transaction-1", "transaction-2"],
+      existingRegistrations: [{
+        registrationKey: "registered-expense-1",
+        sourceTransactionId: "transaction-1",
+        state: "registered",
+        destinationVerified: true,
+        evidenceMethod: "attachment_filename_exact",
+      }],
+    }),
+    nowMs: NOW,
+  });
+  assert.equal(plan.summary.alreadyRegisteredCount, 1);
+  assert.equal(plan.summary.exactMatchCount, 1);
+  assert.equal(plan.summary.ambiguousGroupCount, 0);
+  assert.equal(plan.summary.receiptIssueCount, 0);
+  assert.equal(plan.operations.alreadyRegistered[0].evidenceMethod, "attachment_filename_exact");
+  assert.equal(coinExpensePlanIsBlocked(plan), false);
+});
+
+test("blocks legacy expense input without a complete existing-registration lookup", () => {
+  const candidates = expenseCandidates();
+  delete candidates.registrationLookup;
+  const plan = buildCoinExpensePlan({
+    purchaseEvidence: purchaseEvidence(),
+    expenseCandidates: candidates,
+    nowMs: NOW,
+  });
+  assert.equal(coinExpensePlanIsBlocked(plan), true);
+  assert.ok(plan.operations.blockingIssues.some((issue) => issue.reason === "existing_registration_lookup_incomplete"));
 });
 
 test("incomplete coverage blocks registration and replay detects stale candidates", () => {

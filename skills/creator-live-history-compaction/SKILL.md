@@ -9,6 +9,11 @@ Reduce an existing Lark Base live-session history without inventing aggregate
 or replacement records. The skill is source-neutral and never visits or names
 the service that supplied the observations.
 
+For every Lark Base read or mutation, follow the policy supplied by the
+installed Lark Base provider.
+The archive, exact-approval, and destructive-workflow rules below always take
+precedence.
+
 ## Private configuration
 
 Require the owner-only configuration described in

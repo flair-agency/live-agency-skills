@@ -78,6 +78,10 @@ target. Do not retry an uncertain write blindly; reread and reconcile first.
 
 Treat account and monthly projection tables as derived data. Read projection
 definitions and stable field IDs from the private workspace configuration.
+For every Lark Base projection read or mutation, follow the policy supplied by
+the installed Lark Base provider; the
+projection approval, backup, and canonical-master restrictions below remain
+mandatory.
 Before a create, update, or delete, perform a fresh dry run and require explicit
 approval of the exact target SHA and create/update/delete counts. Never apply a
 projection deletion to the canonical gift-event master.

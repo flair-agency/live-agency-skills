@@ -14,19 +14,30 @@ explicitly completed.
 | Creator live-history compaction | Complete | Lark/Drive identifiers and archives |
 | Creator invitation-status compaction | Complete | Lark/Drive identifiers, avatar backups, and restore archives |
 | Creator profile observation sync | Complete | Service-specific observation provider and Lark configuration |
+| Creator LIVE-history and metrics sync | Complete | Service-specific LIVE provider, existing Lark summary fields/flow, and Lark configuration |
+| Creator LIVE-metrics compaction | Complete | Lark identifiers and generated plans |
+| Creator insight and LIVE-characteristic sync | Complete | Lark identifiers, private evidence contexts/proposals, and approved tag vocabulary |
 | Gift-history reconciliation | Complete | Export acquisition/schema, workbook/Lark identifiers, and account evidence |
 | Coin-expense reconciliation | Complete | Purchase evidence, expense candidates, service-specific registration, and organization accounting policy |
 
-## Private provider candidates
+## Private provider repositories
 
-Private providers remain independently versioned repositories. They implement a
-public capability contract and are installed into a local npm composition root.
+Private providers are independently versioned by external execution surface.
+Each repository keeps implementation and source-specific knowledge together,
+implements public capability bindings, and is installed into a local npm
+composition root.
 
-- creator-profile observation acquisition;
-- gift-history export acquisition and mobile download workflow;
-- TikTok coin-purchase evidence acquisition and receipt verification;
-- MoneyForward expense candidates, organization accounting policy, and reviewed registration; and
-- any service-specific schema, URL, screen, or authenticated workflow.
+| Repository | Migrated responsibilities |
+| --- | --- |
+| `live-agency-provider-lark-base` | Lark Base client and API/browser/import provider policy |
+| `live-agency-provider-backstage` | activity export/paste and invitation observation |
+| `live-agency-provider-tiktok-ios` | LIVE-history/fan-club observation and gift-history export |
+| `live-agency-provider-tiktok-web` | public-profile observation and coin-purchase evidence |
+| `live-agency-provider-moneyforward` | expense candidates, accounting profile, and reviewed registration |
+
+The former capability-specific provider repositories are retained only until
+the new provider repositories are installed and verified. They must not receive
+new provider knowledge after cutover.
 
 ## Excluded or superseded
 

@@ -9,6 +9,11 @@ Compact only redundant adjacent states in the existing Lark history. This skill
 does not access an observation service, refresh statuses, send invitations, or
 modify creator records.
 
+For every Lark Base read or mutation, follow the policy supplied by the
+installed Lark Base provider.
+The archive, exact-approval, and destructive-workflow rules below always take
+precedence.
+
 ## Retention semantics
 
 - Resolve every Lark field by the stable IDs in private configuration. Field
@@ -59,5 +64,7 @@ IDs may differ; semantic values and avatar bytes must verify by rereading.
 - Do not delete without a readback-verified archive receipt. Do not restore when
   creators are missing, timestamps conflict, live records are malformed, or
   existing avatar content differs.
-- Use Lark API access only. Credentials come from the configured environment or
-  keychain service and must never appear in output.
+- Prefer batch APIs for approved delete or restore mutations. On a provider
+  limit, browser fallback is allowed only for the exact reviewed record IDs;
+  import never substitutes for deletion. Credentials come from the configured
+  environment or keychain service and must never appear in output.

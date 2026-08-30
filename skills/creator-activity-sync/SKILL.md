@@ -9,6 +9,11 @@ Reconcile a complete normalized monthly snapshot into existing Lark Base records
 The input source is pluggable; this skill does not know source-service URLs,
 screens, export columns, or provider package names.
 
+For every Lark Base read or mutation, follow the policy supplied by the
+installed Lark Base provider.
+This skill's field, authorization, and verification restrictions remain
+mandatory.
+
 ## Input routing
 
 Accept either:
@@ -35,8 +40,9 @@ table, and five fields by stable IDs. Resolve current field names from those IDs
 at runtime because the record API uses names at its boundary. Never use a
 display name as configuration or as a field identity.
 
-Read and write Lark records through the API only. Do not fall back to editing the
-Lark UI.
+Use exported/browser snapshots for reads unless exact reconciliation requires
+API-only evidence. Use the existing batch-update API for approved mutations;
+on a provider limit, use only the shared policy's exact import/browser fallback.
 
 ## Authorization
 

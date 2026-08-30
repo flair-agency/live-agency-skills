@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creator insight sync"
+  short_description: "Review and sync creator LIVE characteristics"
+  default_prompt: "Use $creator-insight-sync to export evidence and prepare a reviewed dry-run plan for creator insights and approved LIVE-characteristic tags. Do not update Lark until I approve the exact plan hash and count."

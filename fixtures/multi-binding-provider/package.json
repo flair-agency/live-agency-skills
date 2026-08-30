@@ -1,0 +1,36 @@
+{
+  "name": "@fixture/multi-binding-provider",
+  "version": "1.0.0",
+  "type": "module",
+  "peerDependencies": {
+    "@live-agency-skills/source-provider-api": "^1.6.0"
+  },
+  "liveAgencyProvider": {
+    "schemaVersion": 2,
+    "bindings": [
+      {
+        "id": "synthetic-activity",
+        "provides": ["creator-activity-source/v1"],
+        "inputKinds": ["application/x.synthetic-multi-activity+json"],
+        "unattended": true,
+        "knowledgeVersion": "synthetic-activity/1",
+        "execution": {
+          "kind": "module",
+          "entry": "./src/activity.js"
+        }
+      },
+      {
+        "id": "synthetic-invitation",
+        "provides": ["creator-invitation-observation-source/v1"],
+        "inputKinds": ["application/x.synthetic-multi-invitation+json"],
+        "unattended": false,
+        "knowledgeVersion": "synthetic-invitation/1",
+        "execution": {
+          "kind": "instructions",
+          "resource": "./instructions/invitation.md",
+          "resources": ["./knowledge/invitation.md"]
+        }
+      }
+    ]
+  }
+}

@@ -66,9 +66,65 @@ export function buildCoinExpensePlan({ purchaseEvidence, expenseCandidates, nowM
     blockingIssues.push({ reason: "expense_coverage_incomplete", coverage: expenseCandidates.coverage });
   }
 
+  const sourceTransactionIds = purchaseEvidence.purchases
+    .map((purchase) => purchase.transactionId ?? null)
+    .filter((value) => value !== null)
+    .sort();
+  const missingTransactionIdCount = purchaseEvidence.purchases.length - sourceTransactionIds.length;
+  const registrationLookup = expenseCandidates.registrationLookup ?? { complete: false };
+  if (purchaseEvidence.purchases.length && missingTransactionIdCount) {
+    blockingIssues.push({ reason: "existing_registration_lookup_unverifiable", missingTransactionIdCount });
+  }
+  if (
+    purchaseEvidence.purchases.length &&
+    (
+      registrationLookup.complete !== true ||
+      registrationLookup.sourceTransactionIdCount !== sourceTransactionIds.length ||
+      registrationLookup.sourceTransactionIdsSha256 !== sha256Json(sourceTransactionIds)
+    )
+  ) {
+    blockingIssues.push({ reason: "existing_registration_lookup_incomplete" });
+  }
+
+  const existingRegistrationByTransactionId = new Map(
+    (expenseCandidates.existingRegistrations ?? []).map((registration) => [
+      registration.sourceTransactionId,
+      registration,
+    ]),
+  );
+  const purchasesByTransactionId = new Map(
+    purchaseEvidence.purchases
+      .filter((purchase) => purchase.transactionId)
+      .map((purchase) => [purchase.transactionId, purchase]),
+  );
+  for (const transactionId of existingRegistrationByTransactionId.keys()) {
+    if (!purchasesByTransactionId.has(transactionId)) {
+      blockingIssues.push({ reason: "existing_registration_without_purchase" });
+    }
+  }
+
+  const alreadyRegistered = [];
+  const actionablePurchases = [];
+  for (const purchase of purchaseEvidence.purchases) {
+    const registration = purchase.transactionId
+      ? existingRegistrationByTransactionId.get(purchase.transactionId)
+      : null;
+    if (registration) {
+      alreadyRegistered.push({
+        purchaseKey: purchase.purchaseKey,
+        transactionId: purchase.transactionId,
+        registrationKey: registration.registrationKey,
+        destinationVerified: registration.destinationVerified,
+        evidenceMethod: registration.evidenceMethod,
+      });
+    } else {
+      actionablePurchases.push(purchase);
+    }
+  }
+
   const purchaseGroups = new Map();
   const expenseGroups = new Map();
-  for (const purchase of purchaseEvidence.purchases) {
+  for (const purchase of actionablePurchases) {
     const key = groupKey(purchase);
     if (!purchaseGroups.has(key)) purchaseGroups.set(key, []);
     purchaseGroups.get(key).push(purchase);
@@ -141,11 +197,12 @@ export function buildCoinExpensePlan({ purchaseEvidence, expenseCandidates, nowM
 
   const exactTotal = exactMatches.reduce((sum, match) => sum + BigInt(match.amountJpy), 0n).toString();
   const unsigned = {
-    version: 1,
+    version: 2,
     builtAt: new Date(nowMs).toISOString(),
     builtAtMs: nowMs,
     inputs: { purchaseEvidence, expenseCandidates },
     operations: {
+      alreadyRegistered,
       exactMatches,
       unmatchedPurchases,
       unmatchedExpenses,
@@ -156,6 +213,7 @@ export function buildCoinExpensePlan({ purchaseEvidence, expenseCandidates, nowM
     summary: {
       purchaseCount: purchaseEvidence.rowCount,
       expenseCount: expenseCandidates.rowCount,
+      alreadyRegisteredCount: alreadyRegistered.length,
       exactMatchCount: exactMatches.length,
       exactMatchTotalJpy: exactTotal,
       unmatchedPurchaseCount: unmatchedPurchases.length,
@@ -169,17 +227,18 @@ export function buildCoinExpensePlan({ purchaseEvidence, expenseCandidates, nowM
 }
 
 export function validateCoinExpensePlan(plan) {
-  assert(plan?.version === 1, "coin-expense plan version is invalid");
+  assert(plan?.version === 2, "coin-expense plan version is invalid");
   assert(Number.isSafeInteger(plan.builtAtMs), "coin-expense plan builtAtMs is invalid");
   assert(plan.builtAt === new Date(plan.builtAtMs).toISOString(), "coin-expense plan timestamps differ");
   validateCoinPurchaseEvidence(plan.inputs?.purchaseEvidence);
   validateExpenseCandidates(plan.inputs?.expenseCandidates);
   for (const key of [
-    "exactMatches", "unmatchedPurchases", "unmatchedExpenses", "ambiguousGroups",
+    "alreadyRegistered", "exactMatches", "unmatchedPurchases", "unmatchedExpenses", "ambiguousGroups",
     "receiptIssues", "blockingIssues",
   ]) {
     assert(Array.isArray(plan.operations?.[key]), `coin-expense plan operations.${key} is invalid`);
   }
+  assert(plan.summary?.alreadyRegisteredCount === plan.operations.alreadyRegistered.length, "plan already-registered count differs");
   assert(plan.summary?.exactMatchCount === plan.operations.exactMatches.length, "plan exact-match count differs");
   assert(plan.summary?.unmatchedPurchaseCount === plan.operations.unmatchedPurchases.length, "plan unmatched-purchase count differs");
   assert(plan.summary?.unmatchedExpenseCount === plan.operations.unmatchedExpenses.length, "plan unmatched-expense count differs");

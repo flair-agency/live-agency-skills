@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creator LIVE metrics compaction"
+  short_description: "Safely retain representative LIVE metric snapshots"
+  default_prompt: "Use $creator-live-metrics-compaction to create and inspect a dry-run plan for my Lark LIVE metric history. Do not delete anything without my explicit approval of the plan hash and count."

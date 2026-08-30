@@ -11,14 +11,17 @@ packages.
 ## Design
 
 - A public skill depends on a versioned capability, never a provider package ID.
-- Provider packages declare capabilities in `package.json` and implement the
-  public contract.
+- Provider repositories keep one external surface's implementation and
+  versioned knowledge together. Their packages may declare multiple capability
+  bindings in `package.json`.
 - npm's dependency graph is the source of truth for installed providers.
 - Resolution fails closed when zero or multiple providers match.
 - Interactive providers and unattended providers are distinct. Scheduled jobs
   may use only providers that explicitly declare unattended support.
 - Normalized input can bypass provider resolution when it has already been
   prepared and validated.
+- Provider resolution records package version, binding ID, and knowledge
+  version for audit.
 
 See [Provider architecture](docs/provider-architecture.md).
 
@@ -31,11 +34,20 @@ See [Provider architecture](docs/provider-architecture.md).
   discovers normalized observation providers, maintains transition-based Lark
   history through reviewed plans, and keeps observation-service details private.
 - [`creator-profile-sync`](skills/creator-profile-sync/SKILL.md): exports stable
-  targets, validates normalized profile and live-session observations, appends
-  only new Lark history, and verifies every approved write by rereading.
+  targets, validates normalized public-profile observations, appends follower,
+  recent-post, nickname, avatar, and feature-observation history, and verifies
+  every approved write by rereading.
+- [`creator-live-history-sync`](skills/creator-live-history-sync/SKILL.md):
+  validates fan-club and LIVE-session observations, appends new LIVE history,
+  creates one `LIVE指標` snapshot per scan, and verifies the existing Lark flow.
+- [`creator-insight-sync`](skills/creator-insight-sync/SKILL.md): derives
+  reviewed current assessments and approved LIVE-characteristic tags from the
+  latest profile evidence with LIVE metrics as supporting evidence.
 - [`creator-profile-compaction`](skills/creator-profile-compaction/SKILL.md):
   retains representative profile observations using stable Lark field IDs and
   requires hash-and-count approval before any deletion.
+- [`creator-live-metrics-compaction`](skills/creator-live-metrics-compaction/SKILL.md):
+  applies the same representative retention policy to `LIVE指標` snapshots.
 - [`creator-live-history-compaction`](skills/creator-live-history-compaction/SKILL.md):
   archives reversible session records before reviewed deletion and supports
   conflict-checked restoration.

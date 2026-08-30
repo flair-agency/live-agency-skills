@@ -38,7 +38,7 @@ export function normalizeAccountKey(value) {
 }
 
 export function isRecordId(value) {
-  return /^rec[A-Za-z0-9]{8,}$/.test(String(value ?? ""));
+  return /^rec[A-Za-z0-9]{7,}$/.test(String(value ?? ""));
 }
 
 export function linkedRecordIds(value) {
@@ -62,8 +62,34 @@ function parseStoredCount(value) {
   return Number.isSafeInteger(number) && number >= 0 ? number : null;
 }
 
+function parseStoredDate(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = typeof value === "number" ? value : Date.parse(String(value));
+  return Number.isFinite(number) ? number : null;
+}
+
+function parseStoredText(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && typeof value.text === "string") return value.text;
+  return null;
+}
+
+function parseStoredJson(value) {
+  const text = parseStoredText(value);
+  if (text === null) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? stableStringify(parsed)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function validateTargetManifest(manifest) {
-  assert(manifest?.version === 1, "target manifest version is invalid");
+  assert(manifest?.version === 2, "target manifest version is invalid");
   assert(manifest.inputKind === PROFILE_TARGET_INPUT_KIND, "target manifest inputKind is invalid");
   assert(!Number.isNaN(Date.parse(manifest.generatedAt)), "target manifest generatedAt is invalid");
   assert(["due", "selected", "all"].includes(manifest.targetMode), "target manifest mode is invalid");
@@ -80,18 +106,7 @@ export function validateTargetManifest(manifest) {
     assert(!accounts.has(accountKey), `target accountKey is duplicated: ${accountKey}`);
     creatorIds.add(row.creatorRecordId);
     accounts.add(accountKey);
-    assert(row.liveContext && typeof row.liveContext === "object", `target row ${index} liveContext is invalid`);
-    assert(!Number.isNaN(Date.parse(row.liveContext.cutoffAt)), `target row ${index} cutoffAt is invalid`);
-    assert(Array.isArray(row.liveContext.knownEvents), `target row ${index} knownEvents is invalid`);
-    const eventKeys = new Set();
-    for (const event of row.liveContext.knownEvents) {
-      const startMs = Date.parse(event.startAt);
-      const endMs = Date.parse(event.endAt);
-      assert(Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs, `target row ${index} known event is invalid`);
-      const key = `${startMs}:${endMs}`;
-      assert(!eventKeys.has(key), `target row ${index} known event is duplicated`);
-      eventKeys.add(key);
-    }
+    assert(Object.keys(row).length === 2, `target row ${index} contains unsupported context`);
   }
   return manifest;
 }
@@ -102,46 +117,110 @@ function normalizeObservations(snapshot, nowMs) {
   const seenAccounts = new Set();
   for (const creator of normalized.creators) {
     creator.accountKey = normalizeAccountKey(creator.accountKey);
-    assert(creator.accountKey && !seenAccounts.has(creator.accountKey), `observation account is invalid or duplicated: ${creator.accountKey}`);
+    assert(
+      creator.accountKey && !seenAccounts.has(creator.accountKey),
+      `observation account is invalid or duplicated: ${creator.accountKey}`,
+    );
     seenAccounts.add(creator.accountKey);
     const observedAtMs = Date.parse(creator.observedAt);
     assert(observedAtMs <= nowMs + FUTURE_MARGIN_MS, `observation is in the future: ${creator.accountKey}`);
     creator.observedAtMs = observedAtMs;
-    creator.lives = creator.lives.map((live) => ({
-      ...live,
-      startMs: Date.parse(live.startAt),
-      endMs: Date.parse(live.endAt),
-    }));
+    creator.profile.latestPostAtMs = creator.profile.latestPostAt === null
+      ? null
+      : Date.parse(creator.profile.latestPostAt);
+    creator.profile.featureObservationJson = creator.profile.featureObservationData === null
+      ? null
+      : stableStringify(creator.profile.featureObservationData);
   }
   return normalized;
 }
 
-function profileMatches(record, creator, bindings) {
-  const fields = record.fields ?? {};
-  if (!linkedRecordIds(fields[bindings.profile.creator.name]).includes(creator.creatorRecordId)) return false;
+async function hydrateProfileRecord(record, bindings, resolveAttachmentHash) {
+  const reasons = [];
+  const recordId = String(record?.record_id ?? "");
+  if (!isRecordId(recordId)) reasons.push("invalid_record_id");
+  const fields = record?.fields ?? {};
+  const creatorIds = linkedRecordIds(fields[bindings.profile.creator.name]);
+  if (creatorIds.length !== 1) reasons.push("creator_link_not_unique");
   const timestampMs = Number(fields[bindings.profile.timestamp.name]);
-  if (!Number.isFinite(timestampMs) || timestampMs < creator.observedAtMs - PROFILE_REPLAY_MARGIN_MS) return false;
-  const follower = parseStoredCount(fields[bindings.profile.followerCount.name]);
-  const community = parseStoredCount(fields[bindings.profile.communityCount.name]);
-  if (creator.profile.followerCount !== null && follower !== creator.profile.followerCount) return false;
-  if (creator.profile.communityCount !== null && community !== creator.profile.communityCount) return false;
+  if (!Number.isFinite(timestampMs)) reasons.push("invalid_timestamp");
+
+  const rawFollower = fields[bindings.profile.followerCount.name];
+  const rawRecentPosts = fields[bindings.profile.recentPostCount30d.name];
+  const rawLatestPost = fields[bindings.profile.latestPostAt.name];
+  const rawNickname = fields[bindings.profile.nickname.name];
+  const rawFeatureData = fields[bindings.profile.featureObservationData.name];
+  const followerCount = parseStoredCount(rawFollower);
+  const recentPostCount30d = parseStoredCount(rawRecentPosts);
+  const latestPostAtMs = parseStoredDate(rawLatestPost);
+  const nickname = parseStoredText(rawNickname);
+  const featureObservationJson = parseStoredJson(rawFeatureData);
+  if (rawFollower !== null && rawFollower !== undefined && rawFollower !== "" && followerCount === null) {
+    reasons.push("invalid_follower_count");
+  }
+  if (rawRecentPosts !== null && rawRecentPosts !== undefined && rawRecentPosts !== "" && recentPostCount30d === null) {
+    reasons.push("invalid_recent_post_count");
+  }
+  if (rawLatestPost !== null && rawLatestPost !== undefined && rawLatestPost !== "" && latestPostAtMs === null) {
+    reasons.push("invalid_latest_post_at");
+  }
+  if (rawNickname !== null && rawNickname !== undefined && rawNickname !== "" && nickname === null) {
+    reasons.push("invalid_nickname");
+  }
+  if (rawFeatureData !== null && rawFeatureData !== undefined && rawFeatureData !== "" && featureObservationJson === undefined) {
+    reasons.push("invalid_feature_observation_json");
+  }
+
+  const attachments = Array.isArray(fields[bindings.profile.avatar.name])
+    ? fields[bindings.profile.avatar.name]
+    : [];
+  const avatarHashes = [];
+  try {
+    for (const attachment of attachments) avatarHashes.push(await resolveAttachmentHash(attachment));
+  } catch {
+    reasons.push("invalid_avatar_attachment");
+  }
+
+  if (reasons.length) return { valid: false, recordId, reasons: [...new Set(reasons)].sort() };
+  return {
+    valid: true,
+    recordId,
+    creatorRecordId: creatorIds[0],
+    timestampMs,
+    followerCount,
+    recentPostCount30d,
+    latestPostAtMs,
+    nickname,
+    featureObservationJson: featureObservationJson ?? null,
+    avatarHashes: [...new Set(avatarHashes)].sort(),
+  };
+}
+
+function nonAvatarFieldsMatch(record, creator) {
+  const profile = creator.profile;
+  if (profile.followerCount !== null && record.followerCount !== profile.followerCount) return false;
+  if (
+    profile.recentPostCount30d !== null &&
+    record.recentPostCount30d !== profile.recentPostCount30d
+  ) return false;
+  if (profile.latestPostAtMs !== null && record.latestPostAtMs !== profile.latestPostAtMs) return false;
+  if (profile.nickname !== null && record.nickname !== profile.nickname) return false;
+  if (
+    profile.featureObservationJson !== null &&
+    record.featureObservationJson !== profile.featureObservationJson
+  ) return false;
   return true;
 }
 
-function storedLive(record, bindings) {
-  const fields = record.fields ?? {};
-  const creatorIds = linkedRecordIds(fields[bindings.live.creator.name]);
-  const startMs = Number(fields[bindings.live.start.name]);
-  const endMs = Number(fields[bindings.live.end.name]);
-  if (creatorIds.length !== 1 || !Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
-  const rawLikes = fields[bindings.live.likes.name];
-  const likeCount = parseStoredCount(rawLikes);
-  return {
-    recordId: String(record.record_id ?? ""),
-    key: `${creatorIds[0]}:${startMs}:${endMs}`,
-    likeCount,
-    likesInvalid: rawLikes !== null && rawLikes !== undefined && rawLikes !== "" && likeCount === null,
-  };
+function profileHasValue(profile) {
+  return [
+    profile.followerCount,
+    profile.recentPostCount30d,
+    profile.latestPostAt,
+    profile.nickname,
+    profile.avatar,
+    profile.featureObservationData,
+  ].some((value) => value !== null);
 }
 
 function calculatePlanSha256(plan) {
@@ -149,16 +228,18 @@ function calculatePlanSha256(plan) {
   return sha256Json(unsigned);
 }
 
-export function buildProfileSyncPlan({
+export async function buildProfileSyncPlan({
   manifest,
   observations,
   profileRecords,
-  liveRecords,
   bindings,
+  resolveAttachmentHash = async () => {
+    throw new TypeError("attachment hash resolver is unavailable");
+  },
   nowMs = Date.now(),
 }) {
   validateTargetManifest(manifest);
-  assert(Array.isArray(profileRecords) && Array.isArray(liveRecords), "Lark record collections are invalid");
+  assert(Array.isArray(profileRecords), "Lark profile record collection is invalid");
   assert(Number.isSafeInteger(nowMs), "nowMs is invalid");
   const normalized = normalizeObservations(observations, nowMs);
   const targetsById = new Map(manifest.rows.map((row) => [row.creatorRecordId, row]));
@@ -178,126 +259,142 @@ export function buildProfileSyncPlan({
     }
   }
 
-  const liveByKey = new Map();
-  const invalidStoredLives = [];
-  for (const record of liveRecords) {
-    const stored = storedLive(record, bindings);
-    if (!stored || !isRecordId(stored.recordId) || stored.likesInvalid) {
-      invalidStoredLives.push(String(record?.record_id ?? ""));
-      continue;
-    }
-    const matches = liveByKey.get(stored.key) ?? [];
-    matches.push(stored);
-    liveByKey.set(stored.key, matches);
+  const hydrated = await Promise.all(
+    profileRecords.map((record) => hydrateProfileRecord(record, bindings, resolveAttachmentHash)),
+  );
+  const invalidStoredProfiles = hydrated
+    .filter((record) => !record.valid)
+    .map((record) => ({ recordId: record.recordId, reasons: record.reasons }));
+  const validProfiles = hydrated.filter((record) => record.valid);
+  const byCreator = new Map();
+  for (const record of validProfiles) {
+    const rows = byCreator.get(record.creatorRecordId) ?? [];
+    rows.push(record);
+    byCreator.set(record.creatorRecordId, rows);
   }
 
   const profileCreates = [];
+  const profileAttachExisting = [];
   const profileAlreadyApplied = [];
   const profileUnavailable = [];
-  const liveCreates = [];
-  const liveAlreadyApplied = [];
-  const liveConflicts = [];
+  const profileConflicts = [];
   for (const creator of normalized.creators) {
     if (!targetsById.has(creator.creatorRecordId)) continue;
-    const profileHasValue =
-      creator.profile.followerCount !== null || creator.profile.communityCount !== null;
-    if (!profileHasValue) {
+    if (!profileHasValue(creator.profile)) {
       profileUnavailable.push({
         creatorRecordId: creator.creatorRecordId,
         accountKey: creator.accountKey,
-        followerStatus: creator.profile.followerStatus,
-        communityStatus: creator.profile.communityStatus,
+        statuses: {
+          follower: creator.profile.followerStatus,
+          recentPosts: creator.profile.recentPostStatus,
+          latestPost: creator.profile.latestPostStatus,
+          nickname: creator.profile.nicknameStatus,
+          avatar: creator.profile.avatarStatus,
+          featureObservation: creator.profile.featureObservationStatus,
+        },
       });
-    } else if (profileRecords.some((record) => profileMatches(record, creator, bindings))) {
-      profileAlreadyApplied.push({ creatorRecordId: creator.creatorRecordId, accountKey: creator.accountKey });
-    } else {
-      profileCreates.push({
+      continue;
+    }
+    const candidates = (byCreator.get(creator.creatorRecordId) ?? []).filter(
+      (record) =>
+        record.timestampMs >= creator.observedAtMs - PROFILE_REPLAY_MARGIN_MS &&
+        nonAvatarFieldsMatch(record, creator),
+    );
+    const avatarHash = creator.profile.avatar?.sha256 ?? null;
+    const exact = candidates.filter(
+      (record) => avatarHash === null || record.avatarHashes.includes(avatarHash),
+    );
+    if (exact.length) {
+      profileAlreadyApplied.push({
         creatorRecordId: creator.creatorRecordId,
         accountKey: creator.accountKey,
-        observedAtMs: creator.observedAtMs,
-        followerCount: creator.profile.followerCount,
-        communityCount: creator.profile.communityCount,
+        recordId: exact.sort((left, right) => right.timestampMs - left.timestampMs)[0].recordId,
       });
+      continue;
     }
-
-    for (const live of creator.lives) {
-      const key = `${creator.creatorRecordId}:${live.startMs}:${live.endMs}`;
-      const matches = liveByKey.get(key) ?? [];
-      if (matches.length > 1) {
-        liveConflicts.push({ creatorRecordId: creator.creatorRecordId, key, reason: "duplicate_existing_records" });
-      } else if (matches.length === 1 && matches[0].likeCount !== live.likeCount) {
-        liveConflicts.push({
-          creatorRecordId: creator.creatorRecordId,
-          key,
-          reason: "existing_like_count_differs",
-          storedLikeCount: matches[0].likeCount,
-          observedLikeCount: live.likeCount,
-        });
-      } else if (matches.length === 1) {
-        liveAlreadyApplied.push({ creatorRecordId: creator.creatorRecordId, key, recordId: matches[0].recordId });
-      } else {
-        liveCreates.push({
-          creatorRecordId: creator.creatorRecordId,
-          accountKey: creator.accountKey,
-          startMs: live.startMs,
-          endMs: live.endMs,
-          likeCount: live.likeCount,
-        });
-      }
+    const attachmentCandidates = avatarHash === null
+      ? []
+      : candidates.filter((record) => record.avatarHashes.length === 0);
+    if (attachmentCandidates.length === 1) {
+      profileAttachExisting.push({
+        creatorRecordId: creator.creatorRecordId,
+        accountKey: creator.accountKey,
+        recordId: attachmentCandidates[0].recordId,
+        avatar: creator.profile.avatar,
+      });
+      continue;
     }
+    if (attachmentCandidates.length > 1) {
+      profileConflicts.push({
+        creatorRecordId: creator.creatorRecordId,
+        accountKey: creator.accountKey,
+        reason: "multiple_attachment_resume_candidates",
+      });
+      continue;
+    }
+    profileCreates.push({
+      creatorRecordId: creator.creatorRecordId,
+      accountKey: creator.accountKey,
+      observedAtMs: creator.observedAtMs,
+      followerCount: creator.profile.followerCount,
+      recentPostCount30d: creator.profile.recentPostCount30d,
+      latestPostAtMs: creator.profile.latestPostAtMs,
+      nickname: creator.profile.nickname,
+      avatar: creator.profile.avatar,
+      featureObservationJson: creator.profile.featureObservationJson,
+    });
   }
 
   const unsigned = {
-    version: 1,
+    version: 2,
     builtAt: new Date(nowMs).toISOString(),
     builtAtMs: nowMs,
     inputs: { manifest, observations: normalized },
     operations: {
       profileCreates,
+      profileAttachExisting,
       profileAlreadyApplied,
       profileUnavailable,
-      liveCreates,
-      liveAlreadyApplied,
-      liveConflicts,
+      profileConflicts,
       targetIssues,
-      invalidStoredLives: invalidStoredLives.sort(),
+      invalidStoredProfiles,
     },
     summary: {
       targetCount: manifest.rowCount,
       observationCount: normalized.rowCount,
       profileCreateCount: profileCreates.length,
+      profileAttachCount:
+        profileAttachExisting.length + profileCreates.filter((item) => item.avatar).length,
+      profileAttachExistingCount: profileAttachExisting.length,
       profileAlreadyAppliedCount: profileAlreadyApplied.length,
       profileUnavailableCount: profileUnavailable.length,
-      liveObservedCount: normalized.creators.reduce((sum, creator) => sum + creator.lives.length, 0),
-      liveCreateCount: liveCreates.length,
-      liveAlreadyAppliedCount: liveAlreadyApplied.length,
-      liveConflictCount: liveConflicts.length,
+      profileConflictCount: profileConflicts.length,
       targetIssueCount: targetIssues.length,
-      invalidStoredLiveCount: invalidStoredLives.length,
+      invalidStoredProfileCount: invalidStoredProfiles.length,
     },
   };
   return { ...unsigned, planSha256: calculatePlanSha256(unsigned) };
 }
 
 export function validateProfileSyncPlan(plan) {
-  assert(plan?.version === 1, "plan version is invalid");
+  assert(plan?.version === 2, "plan version is invalid");
   assert(Number.isSafeInteger(plan.builtAtMs), "plan builtAtMs is invalid");
   assert(plan.builtAt === new Date(plan.builtAtMs).toISOString(), "plan timestamps do not match");
   assert(plan.operations && plan.summary, "plan structure is invalid");
-  const arrays = [
+  for (const key of [
     "profileCreates",
+    "profileAttachExisting",
     "profileAlreadyApplied",
     "profileUnavailable",
-    "liveCreates",
-    "liveAlreadyApplied",
-    "liveConflicts",
+    "profileConflicts",
     "targetIssues",
-    "invalidStoredLives",
-  ];
-  for (const key of arrays) assert(Array.isArray(plan.operations[key]), `plan operations.${key} is invalid`);
+    "invalidStoredProfiles",
+  ]) {
+    assert(Array.isArray(plan.operations[key]), `plan operations.${key} is invalid`);
+  }
   assert(plan.summary.profileCreateCount === plan.operations.profileCreates.length, "plan profile create count does not match");
-  assert(plan.summary.liveCreateCount === plan.operations.liveCreates.length, "plan live create count does not match");
-  assert(plan.summary.liveConflictCount === plan.operations.liveConflicts.length, "plan live conflict count does not match");
+  assert(plan.summary.profileAttachExistingCount === plan.operations.profileAttachExisting.length, "plan profile attach-existing count does not match");
+  assert(plan.summary.profileConflictCount === plan.operations.profileConflicts.length, "plan profile conflict count does not match");
   assert(plan.summary.targetIssueCount === plan.operations.targetIssues.length, "plan target issue count does not match");
   assert(plan.planSha256 === calculatePlanSha256(plan), "plan SHA does not match content");
   return plan;
@@ -305,8 +402,8 @@ export function validateProfileSyncPlan(plan) {
 
 export function planIsBlocked(plan) {
   return (
-    plan.summary.liveConflictCount > 0 ||
+    plan.summary.profileConflictCount > 0 ||
     plan.summary.targetIssueCount > 0 ||
-    plan.summary.invalidStoredLiveCount > 0
+    plan.summary.invalidStoredProfileCount > 0
   );
 }

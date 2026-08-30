@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creator LIVE history sync"
+  short_description: "Safely append LIVE history and LIVE metric snapshots"
+  default_prompt: "Use $creator-live-history-sync to prepare a reviewed dry run from normalized LIVE observations. Apply only after I approve the exact plan hash, LIVE-create count, and LIVE-metric-create count."

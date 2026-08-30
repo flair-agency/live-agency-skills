@@ -1,12 +1,14 @@
+import { createHash } from "node:crypto";
+import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { LARK_MEDIA_MAX_BYTES } from "@live-agency-skills/lark-base-client";
 import { readPrivateJson, writePrivateJson } from "@live-agency-skills/private-runtime-files";
 
 import {
   PROFILE_TARGET_INPUT_KIND,
   buildProfileSyncPlan,
   isRecordId,
-  linkedRecordIds,
   normalizeAccountKey,
   planIsBlocked,
   sha256Json,
@@ -14,8 +16,6 @@ import {
   validateTargetManifest,
 } from "./profile_sync_core.mjs";
 
-const KNOWN_EVENT_LIMIT = 20;
-const LIVE_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 const BATCH_SIZE = 500;
 
 function assert(condition, message) {
@@ -26,7 +26,7 @@ export { writePrivateJson };
 
 export async function loadProfileConfig(filePath) {
   const raw = await readPrivateJson(path.resolve(filePath));
-  for (const key of ["appToken", "creatorTableId", "profileTableId", "liveTableId", "dueViewId"]) {
+  for (const key of ["appToken", "creatorTableId", "profileTableId", "dueViewId"]) {
     assert(typeof raw[key] === "string" && raw[key].trim(), `configuration ${key} is required`);
   }
   const keys = [
@@ -34,11 +34,11 @@ export async function loadProfileConfig(filePath) {
     "profileTimestamp",
     "profileCreator",
     "profileFollowerCount",
-    "profileCommunityCount",
-    "liveStart",
-    "liveEnd",
-    "liveCreator",
-    "liveLikes",
+    "profileRecentPostCount30d",
+    "profileLatestPostAt",
+    "profileNickname",
+    "profileAvatar",
+    "profileFeatureObservationData",
   ];
   assert(raw.fieldIds && typeof raw.fieldIds === "object", "configuration fieldIds is required");
   const values = keys.map((key) => {
@@ -51,7 +51,6 @@ export async function loadProfileConfig(filePath) {
     appToken: raw.appToken.trim(),
     creatorTableId: raw.creatorTableId.trim(),
     profileTableId: raw.profileTableId.trim(),
-    liveTableId: raw.liveTableId.trim(),
     dueViewId: raw.dueViewId.trim(),
     fieldIds: Object.fromEntries(keys.map((key, index) => [key, values[index]])),
     apiOrigin: typeof raw.apiOrigin === "string" && raw.apiOrigin.trim()
@@ -87,10 +86,9 @@ function relation(binding, tableId, label) {
   return binding;
 }
 
-export function resolveProfileFields(creatorFields, profileFields, liveFields, config) {
+export function resolveProfileFields(creatorFields, profileFields, config) {
   const creator = fieldMap(creatorFields);
   const profile = fieldMap(profileFields);
-  const live = fieldMap(liveFields);
   const bindings = {
     creator: {
       account: bind(creator, config.fieldIds.creatorAccount, ["Url", "Text"], "creator account"),
@@ -103,23 +101,20 @@ export function resolveProfileFields(creatorFields, profileFields, liveFields, c
         "profile creator",
       ),
       followerCount: bind(profile, config.fieldIds.profileFollowerCount, ["Number"], "profile follower count"),
-      communityCount: bind(profile, config.fieldIds.profileCommunityCount, ["Number"], "profile community count"),
-    },
-    live: {
-      start: bind(live, config.fieldIds.liveStart, ["DateTime"], "live start"),
-      end: bind(live, config.fieldIds.liveEnd, ["DateTime"], "live end"),
-      creator: relation(
-        bind(live, config.fieldIds.liveCreator, ["DuplexLink"], "live creator"),
-        config.creatorTableId,
-        "live creator",
+      recentPostCount30d: bind(profile, config.fieldIds.profileRecentPostCount30d, ["Number"], "profile recent post count"),
+      latestPostAt: bind(profile, config.fieldIds.profileLatestPostAt, ["DateTime"], "profile latest post"),
+      nickname: bind(profile, config.fieldIds.profileNickname, ["Text"], "profile nickname"),
+      avatar: bind(profile, config.fieldIds.profileAvatar, ["Attachment"], "profile avatar"),
+      featureObservationData: bind(
+        profile,
+        config.fieldIds.profileFeatureObservationData,
+        ["Text"],
+        "profile feature observation data",
       ),
-      likes: bind(live, config.fieldIds.liveLikes, ["Number"], "live likes"),
     },
   };
   const profileNames = Object.values(bindings.profile).map((value) => value.name);
-  const liveNames = Object.values(bindings.live).map((value) => value.name);
   assert(new Set(profileNames).size === profileNames.length, "resolved profile field names must be unique");
-  assert(new Set(liveNames).size === liveNames.length, "resolved live field names must be unique");
   return bindings;
 }
 
@@ -156,37 +151,12 @@ function selectTargetRows({ records, accountFieldName, mode, selectedAccounts, l
   return selected.slice(0, limit);
 }
 
-function knownLives(liveRecords, bindings) {
-  const byCreator = new Map();
-  const seenKeys = new Set();
-  for (const [index, record] of liveRecords.entries()) {
-    const fields = record.fields ?? {};
-    const creatorIds = linkedRecordIds(fields[bindings.live.creator.name]);
-    const startMs = Number(fields[bindings.live.start.name]);
-    const endMs = Number(fields[bindings.live.end.name]);
-    assert(creatorIds.length === 1, `stored live row ${index + 1} creator link is invalid`);
-    assert(Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs, `stored live row ${index + 1} timestamps are invalid`);
-    const key = `${creatorIds[0]}:${startMs}:${endMs}`;
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
-    const rows = byCreator.get(creatorIds[0]) ?? [];
-    rows.push({ startAt: new Date(startMs).toISOString(), endAt: new Date(endMs).toISOString() });
-    byCreator.set(creatorIds[0], rows);
-  }
-  for (const rows of byCreator.values()) {
-    rows.sort((left, right) => Date.parse(right.startAt) - Date.parse(left.startAt));
-    rows.splice(KNOWN_EVENT_LIMIT);
-  }
-  return byCreator;
-}
-
-async function resolveLiveBindings(client, config) {
-  const [creatorFields, profileFields, liveFields] = await Promise.all([
+async function resolveBindings(client, config) {
+  const [creatorFields, profileFields] = await Promise.all([
     client.listFields(config.appToken, config.creatorTableId),
     client.listFields(config.appToken, config.profileTableId),
-    client.listFields(config.appToken, config.liveTableId),
   ]);
-  return resolveProfileFields(creatorFields, profileFields, liveFields, config);
+  return resolveProfileFields(creatorFields, profileFields, config);
 }
 
 export async function exportProfileTargets({
@@ -200,29 +170,18 @@ export async function exportProfileTargets({
   assert(["due", "selected", "all"].includes(mode), "target mode is invalid");
   assert(Number.isSafeInteger(limit) && limit >= 1 && limit <= 100, "limit must be between 1 and 100");
   assert(mode === "selected" || selectedAccounts.length === 0, "selected accounts require selected mode");
-  const bindings = await resolveLiveBindings(client, config);
+  const bindings = await resolveBindings(client, config);
   const query = mode === "due" ? { view_id: config.dueViewId } : {};
-  const [creatorRecords, liveRecords] = await Promise.all([
-    client.listRecords(config.appToken, config.creatorTableId, query),
-    client.listRecords(config.appToken, config.liveTableId),
-  ]);
-  const selected = selectTargetRows({
-    records: creatorRecords,
+  const records = await client.listRecords(config.appToken, config.creatorTableId, query);
+  const rows = selectTargetRows({
+    records,
     accountFieldName: bindings.creator.account.name,
     mode,
     selectedAccounts,
     limit,
   });
-  const history = knownLives(liveRecords, bindings);
-  const rows = selected.map((row) => ({
-    ...row,
-    liveContext: {
-      cutoffAt: new Date(nowMs - LIVE_LOOKBACK_MS).toISOString(),
-      knownEvents: history.get(row.creatorRecordId) ?? [],
-    },
-  }));
   const manifest = {
-    version: 1,
+    version: 2,
     inputKind: PROFILE_TARGET_INPUT_KIND,
     generatedAt: new Date(nowMs).toISOString(),
     targetMode: mode,
@@ -253,10 +212,10 @@ async function verifyTargets({ client, config, manifest, bindings }) {
   }
   const issues = [];
   for (const row of manifest.rows) {
-    const live = allById.get(row.creatorRecordId);
+    const current = allById.get(row.creatorRecordId);
     const expected = normalizeAccountKey(row.accountKey);
-    if (!live) issues.push({ creatorRecordId: row.creatorRecordId, reason: "creator_record_missing" });
-    else if (normalizeAccountKey(accountText(live.fields?.[bindings.creator.account.name])) !== expected) {
+    if (!current) issues.push({ creatorRecordId: row.creatorRecordId, reason: "creator_record_missing" });
+    else if (normalizeAccountKey(accountText(current.fields?.[bindings.creator.account.name])) !== expected) {
       issues.push({ creatorRecordId: row.creatorRecordId, reason: "creator_account_changed" });
     } else if ((accounts.get(expected) ?? []).length !== 1) {
       issues.push({ creatorRecordId: row.creatorRecordId, reason: "creator_account_not_unique" });
@@ -267,14 +226,36 @@ async function verifyTargets({ client, config, manifest, bindings }) {
   return issues;
 }
 
+async function verifyAvatarFile(avatar) {
+  if (!avatar) return;
+  const filePath = path.resolve(avatar.path);
+  const stat = await lstat(filePath);
+  assert(stat.isFile() && !stat.isSymbolicLink(), "avatar must be a regular file");
+  assert(
+    stat.size === avatar.size && stat.size >= 1 && stat.size <= LARK_MEDIA_MAX_BYTES,
+    "avatar file size does not match normalized metadata",
+  );
+  const hash = createHash("sha256").update(await readFile(filePath)).digest("hex");
+  assert(hash === avatar.sha256, "avatar file hash does not match normalized metadata");
+}
+
+async function verifyObservationAvatars(observations) {
+  for (const creator of observations.creators) await verifyAvatarFile(creator.profile.avatar);
+}
+
 export async function prepareProfilePlan({ client, config, manifest, observations, nowMs = Date.now() }) {
-  const bindings = await resolveLiveBindings(client, config);
+  await verifyObservationAvatars(observations);
+  const bindings = await resolveBindings(client, config);
   const targetIssues = await verifyTargets({ client, config, manifest, bindings });
-  const [profileRecords, liveRecords] = await Promise.all([
-    client.listRecords(config.appToken, config.profileTableId),
-    client.listRecords(config.appToken, config.liveTableId),
-  ]);
-  const plan = buildProfileSyncPlan({ manifest, observations, profileRecords, liveRecords, bindings, nowMs });
+  const profileRecords = await client.listRecords(config.appToken, config.profileTableId);
+  const plan = await buildProfileSyncPlan({
+    manifest,
+    observations,
+    profileRecords,
+    bindings,
+    resolveAttachmentHash: (attachment) => client.attachmentSha256(attachment),
+    nowMs,
+  });
   if (targetIssues.length) {
     plan.operations.targetIssues.push(...targetIssues);
     plan.summary.targetIssueCount = plan.operations.targetIssues.length;
@@ -284,27 +265,50 @@ export async function prepareProfilePlan({ client, config, manifest, observation
   return { plan, bindings };
 }
 
-function profilePayload(item, bindings) {
+function profilePayload(item, bindings, avatarFileToken = null) {
   const fields = { [bindings.profile.creator.name]: [item.creatorRecordId] };
-  if (item.followerCount !== null) fields[bindings.profile.followerCount.name] = item.followerCount;
-  if (item.communityCount !== null) fields[bindings.profile.communityCount.name] = item.communityCount;
-  return { fields };
-}
-
-function livePayload(item, bindings) {
-  const fields = {
-    [bindings.live.start.name]: item.startMs,
-    [bindings.live.end.name]: item.endMs,
-    [bindings.live.creator.name]: [item.creatorRecordId],
-  };
-  if (item.likeCount !== null) fields[bindings.live.likes.name] = item.likeCount;
-  return { fields };
-}
-
-async function createInBatches(client, appToken, tableId, records) {
-  for (let index = 0; index < records.length; index += BATCH_SIZE) {
-    await client.batchCreate(appToken, tableId, records.slice(index, index + BATCH_SIZE));
+  if (bindings.profile.timestamp.type === "DateTime") {
+    fields[bindings.profile.timestamp.name] = item.observedAtMs;
   }
+  if (item.followerCount !== null) fields[bindings.profile.followerCount.name] = item.followerCount;
+  if (item.recentPostCount30d !== null) {
+    fields[bindings.profile.recentPostCount30d.name] = item.recentPostCount30d;
+  }
+  if (item.latestPostAtMs !== null) fields[bindings.profile.latestPostAt.name] = item.latestPostAtMs;
+  if (item.nickname !== null) fields[bindings.profile.nickname.name] = item.nickname;
+  if (item.featureObservationJson !== null) {
+    fields[bindings.profile.featureObservationData.name] = item.featureObservationJson;
+  }
+  if (avatarFileToken !== null) {
+    fields[bindings.profile.avatar.name] = [{ file_token: avatarFileToken }];
+  }
+  return { fields };
+}
+
+async function createInBatches(client, appToken, tableId, rows) {
+  const created = [];
+  for (let index = 0; index < rows.length; index += BATCH_SIZE) {
+    created.push(...await client.batchCreate(appToken, tableId, rows.slice(index, index + BATCH_SIZE)));
+  }
+  return created;
+}
+
+async function uploadAvatar(client, config, item) {
+  if (!item.avatar) return null;
+  await verifyAvatarFile(item.avatar);
+  return client.uploadMedia(config.appToken, item.avatar);
+}
+
+async function attachAvatar(client, config, bindings, item, recordId) {
+  const fileToken = await uploadAvatar(client, config, item);
+  if (fileToken === null) return;
+  await client.appendAttachment(
+    config.appToken,
+    config.profileTableId,
+    recordId,
+    bindings.profile.avatar.id,
+    fileToken,
+  );
 }
 
 export async function applyProfilePlan({
@@ -314,7 +318,7 @@ export async function applyProfilePlan({
   apply = false,
   expectSha256,
   confirmProfileCreate,
-  confirmLiveCreate,
+  confirmProfileAttach,
 }) {
   validateProfileSyncPlan(reviewedPlan);
   const current = await prepareProfilePlan({
@@ -325,8 +329,9 @@ export async function applyProfilePlan({
     nowMs: reviewedPlan.builtAtMs,
   });
   const plan = current.plan;
+  const operationCount = plan.summary.profileCreateCount + plan.summary.profileAttachExistingCount;
   const report = {
-    status: planIsBlocked(plan) ? "blocked" : plan.summary.profileCreateCount || plan.summary.liveCreateCount ? "ready" : "unchanged",
+    status: planIsBlocked(plan) ? "blocked" : operationCount ? "ready" : "unchanged",
     dryRun: true,
     planSha256: plan.planSha256,
     ...plan.summary,
@@ -338,25 +343,30 @@ export async function applyProfilePlan({
   assert(!planIsBlocked(plan), "blocking issues prevent apply");
   assert(expectSha256 === plan.planSha256, "--expect-sha256 does not match the current plan");
   assert(Number(confirmProfileCreate) === plan.summary.profileCreateCount, "--confirm-profile-create does not match");
-  assert(Number(confirmLiveCreate) === plan.summary.liveCreateCount, "--confirm-live-create does not match");
-  if (!plan.summary.profileCreateCount && !plan.summary.liveCreateCount) {
+  assert(Number(confirmProfileAttach) === plan.summary.profileAttachCount, "--confirm-profile-attach does not match");
+  if (!operationCount) {
     return { ...report, dryRun: false, status: "unchanged", verified: true };
   }
 
   let writeError = null;
   try {
-    await createInBatches(
+    for (const item of plan.operations.profileAttachExisting) {
+      await attachAvatar(client, config, current.bindings, item, item.recordId);
+    }
+    const createItems = plan.operations.profileCreates;
+    const avatarFileTokens = [];
+    for (const item of createItems) avatarFileTokens.push(await uploadAvatar(client, config, item));
+    const created = await createInBatches(
       client,
       config.appToken,
       config.profileTableId,
-      plan.operations.profileCreates.map((item) => profilePayload(item, current.bindings)),
+      createItems.map((item, index) => profilePayload(item, current.bindings, avatarFileTokens[index])),
     );
-    await createInBatches(
-      client,
-      config.appToken,
-      config.liveTableId,
-      plan.operations.liveCreates.map((item) => livePayload(item, current.bindings)),
-    );
+    assert(created.length === createItems.length, "created profile response count does not match");
+    for (let index = 0; index < created.length; index += 1) {
+      const recordId = String(created[index]?.record_id ?? "");
+      assert(isRecordId(recordId), "created profile record ID is missing");
+    }
   } catch (error) {
     writeError = error;
   }
@@ -373,19 +383,19 @@ export async function applyProfilePlan({
     });
     if (
       verification.plan.summary.profileCreateCount === 0 &&
-      verification.plan.summary.liveCreateCount === 0 &&
+      verification.plan.summary.profileAttachExistingCount === 0 &&
       !planIsBlocked(verification.plan)
     ) break;
   }
   if (
     verification.plan.summary.profileCreateCount !== 0 ||
-    verification.plan.summary.liveCreateCount !== 0 ||
+    verification.plan.summary.profileAttachExistingCount !== 0 ||
     planIsBlocked(verification.plan)
   ) {
     const reason = writeError ? `write result is uncertain: ${writeError.message}` : "post-write verification failed";
     throw new Error(
       `${reason}; remaining profiles=${verification.plan.summary.profileCreateCount}; ` +
-      `remaining lives=${verification.plan.summary.liveCreateCount}; automatic retry is disabled`,
+      `remaining attachments=${verification.plan.summary.profileAttachExistingCount}; automatic retry is disabled`,
     );
   }
   return {
@@ -393,9 +403,8 @@ export async function applyProfilePlan({
     dryRun: false,
     planSha256: plan.planSha256,
     profileCreatedCount: plan.summary.profileCreateCount,
-    liveCreatedCount: plan.summary.liveCreateCount,
+    profileAttachedCount: plan.summary.profileAttachCount,
     profileVerifiedCount: verification.plan.summary.profileAlreadyAppliedCount,
-    liveVerifiedCount: verification.plan.summary.liveAlreadyAppliedCount,
     verified: true,
     recoveredFromAmbiguousResponse: Boolean(writeError),
   };

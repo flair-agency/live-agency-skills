@@ -1,4 +1,4 @@
-# Normalized creator profile observations
+# Normalized creator public-profile observations
 
 ```json
 {
@@ -13,23 +13,28 @@
         "followerCount": 17000,
         "followerStatus": "observed_rounded",
         "followerDisplay": "17K",
-        "communityCount": 123,
-        "communityStatus": "observed_exact"
-      },
-      "liveScan": {
-        "mode": "incremental",
-        "stopReason": "known-anchor",
-        "knownMatchCount": 2
-      },
-      "lives": [
-        {
-          "startAt": "2030-01-01T12:00:00.000Z",
-          "endAt": "2030-01-01T13:00:00.000Z",
-          "likeCount": 21400,
-          "likeStatus": "observed_rounded",
-          "likeDisplay": "21.4K"
-        }
-      ]
+        "recentPostCount30d": 8,
+        "recentPostStatus": "observed_exact",
+        "latestPostAt": "2030-01-01T12:00:00.000Z",
+        "latestPostStatus": "observed_exact",
+        "nickname": "Synthetic Creator",
+        "nicknameStatus": "observed_exact",
+        "avatar": {
+          "path": "/private/runtime/avatar.png",
+          "sha256": "64-lowercase-hex-characters",
+          "size": 1234,
+          "name": "avatar.png",
+          "mimeType": "image/png"
+        },
+        "avatarStatus": "observed_exact",
+        "featureObservationData": {
+          "schema_version": 1,
+          "profile": { "display_name": "Synthetic Creator" },
+          "posts": { "last_30_days_count": 8 },
+          "observation": { "observed_at": "2030-01-02T03:03:00.000Z" }
+        },
+        "featureObservationStatus": "observed_exact"
+      }
     }
   ]
 }
@@ -38,20 +43,18 @@
 Rules:
 
 - The complete target set appears exactly once; `rowCount` equals its length.
-- Creator record IDs and account keys remain exactly associated with the target
-  manifest. Account keys are unique after normalization.
-- Every time is an ISO date-time. A live end is at or after its start and no
-  more than 24 hours later.
-- Counts are non-negative integers or `null`. `null` is never interpreted as
-  zero.
-- Observed rounded values retain their displayed source text.
-- Metric statuses are `observed_exact`, `observed_rounded`, `not_available`,
-  `no_history`, `account_mismatch`, `authentication_required`, `blocked`, or
+- Creator IDs and account keys remain associated with the target manifest and
+  are unique after normalization.
+- Counts are non-negative integers or `null`. `null` is never zero.
+- Non-null text, time, avatar, and feature-observation values use
+  `observed_exact`. Rounded follower values retain their display text.
+- Unavailable values are `null` with `not_available`, `no_history`,
+  `account_mismatch`, `authentication_required`, `blocked`, or
   `schema_changed`.
-- Scan modes are `incremental`, `reconcile-window`, or `baseline-full`.
-- Stop reasons are `known-anchor`, `cutoff`, `history-end`, `no-history`, or
-  `unavailable`.
-- Live sessions are unique per creator by start and end time.
-
-Raw source payloads, cookies, signed URLs, screenshots, or account secrets do
-not belong in this format.
+- Empty profile text remains `null`; do not emit placeholder phrases.
+- Avatar paths are absolute private local files with verified metadata. Source
+  URLs do not belong in the normalized contract.
+- Feature-observation data is a versioned JSON object no larger than 100000
+  UTF-8 bytes. Equivalent promoted values and timestamps must agree.
+- Raw source payloads, cookies, signed URLs, screenshots, and account secrets do
+  not belong in this format.

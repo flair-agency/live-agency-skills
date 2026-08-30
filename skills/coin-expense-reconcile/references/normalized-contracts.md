@@ -54,6 +54,13 @@ SHA-256 values may not be reused.
     "toDate": "2030-01-03",
     "complete": true
   },
+  "registrationLookup": {
+    "complete": true,
+    "sourceTransactionIdCount": 1,
+    "sourceTransactionIdsSha256": "64 lowercase hexadecimal characters"
+  },
+  "existingRegistrationCount": 0,
+  "existingRegistrations": [],
   "rowCount": 1,
   "expenses": [
     {
@@ -72,6 +79,31 @@ The private expense provider includes only rows it has positively identified as
 belonging to `serviceKey`. `registrationProfileKey` represents all accounting
 decisions that could change the meaning of duplicate rows. Rows are strictly
 ordered by date, amount, occurrence, and stable key.
+
+`registrationLookup` proves that the destination was searched for the exact
+set of non-null purchase transaction IDs in the reviewed scope. Its digest is
+SHA-256 over the UTF-8 JSON encoding of the sorted unique ID array. A verified
+existing registration is represented separately from unregistered candidates:
+
+```json
+{
+  "registrationKey": "registered-expense-1",
+  "sourceTransactionId": "source-transaction-1",
+  "state": "registered",
+  "destinationVerified": true,
+  "evidenceMethod": "memo_exact"
+}
+```
+
+`evidenceMethod` is `memo_exact` or `attachment_filename_exact`. The latter
+means an attached evidence filename's basename exactly equals the already-known
+source transaction ID; it is not fuzzy filename inference.
+
+`existingRegistrations` is strictly ordered by source transaction ID and
+registration key. Both keys must be unique. Absence from `expenses` does not
+mean registered: only an exact, unique, destination-verified transaction-ID
+observation reserves a purchase. Legacy inputs may omit the lookup fields, but
+the planner blocks them whenever purchases are in scope.
 
 Both coverage objects must cover the reviewed scope completely before a
 registration bundle can be prepared. Production inputs and generated artifacts

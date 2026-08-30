@@ -61,6 +61,36 @@ test("loads an instruction provider through its capability", async () => {
   assert.equal(observations.rowCount, 1);
 });
 
+test("selects one binding from a multi-capability provider and loads its knowledge", async () => {
+  const providers = await discoverProviders({
+    rootDir,
+    dependencyNames: ["@fixture/multi-binding-provider"],
+  });
+  assert.equal(providers.length, 2);
+
+  const activity = await resolveProvider({
+    providers,
+    capability: ACTIVITY_CAPABILITY,
+    request: {
+      inputKind: "application/x.synthetic-multi-activity+json",
+      month: "2030-01",
+      sourceUpdatedAt: "2030-01-02T03:04:05.000Z",
+    },
+    unattended: true,
+  });
+  assert.equal(activity.bindingId, "synthetic-activity");
+  assert.equal(activity.knowledgeVersion, "synthetic-activity/1");
+
+  const invitation = await resolveProvider({
+    providers,
+    capability: INVITATION_CAPABILITY,
+    request: { inputKind: "application/x.synthetic-multi-invitation+json" },
+  });
+  assert.equal(invitation.bindingId, "synthetic-invitation");
+  assert.equal(invitation.knowledgeVersion, "synthetic-invitation/1");
+  assert.match(invitation.instructions, /Synthetic bundled knowledge/);
+});
+
 test("missing and ambiguous providers fail closed", async () => {
   const providers = await discoverProviders({
     rootDir,

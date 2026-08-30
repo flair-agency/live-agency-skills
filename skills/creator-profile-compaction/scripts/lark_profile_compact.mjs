@@ -47,7 +47,7 @@ export function calculateCompactionPlanSha256(plan) {
 }
 
 export function isRecordId(value) {
-  return /^rec[A-Za-z0-9]{8,}$/.test(String(value ?? ""));
+  return /^rec[A-Za-z0-9]{7,}$/.test(String(value ?? ""));
 }
 
 export function linkedRecordIds(value) {
@@ -68,10 +68,19 @@ export function linkedRecordIds(value) {
 export async function loadConfig(filePath) {
   assert(filePath, "--config is required");
   const raw = await readPrivateJson(path.resolve(filePath));
-  for (const key of ["appToken", "tableId"]) {
+  for (const key of ["appToken", "creatorTableId", "tableId"]) {
     assert(typeof raw[key] === "string" && raw[key].trim(), `configuration ${key} is required`);
   }
-  const fieldKeys = ["timestamp", "creator", "followerCount", "communityCount"];
+  const fieldKeys = [
+    "timestamp",
+    "creator",
+    "followerCount",
+    "recentPostCount30d",
+    "latestPostAt",
+    "nickname",
+    "avatar",
+    "featureObservationData",
+  ];
   assert(raw.fieldIds && typeof raw.fieldIds === "object", "configuration fieldIds is required");
   const values = fieldKeys.map((key) => {
     const value = raw.fieldIds[key];
@@ -81,6 +90,7 @@ export async function loadConfig(filePath) {
   assert(new Set(values).size === values.length, "configuration field IDs must be distinct");
   return {
     appToken: raw.appToken.trim(),
+    creatorTableId: raw.creatorTableId.trim(),
     tableId: raw.tableId.trim(),
     fieldIds: Object.fromEntries(fieldKeys.map((key, index) => [key, values[index]])),
     apiOrigin: typeof raw.apiOrigin === "string" && raw.apiOrigin.trim()
@@ -89,7 +99,11 @@ export async function loadConfig(filePath) {
   };
 }
 
-export function resolveFields(fields, fieldIds) {
+function typeMatches(field, names, numbers) {
+  return names.includes(String(field.uiType ?? field.ui_type ?? "")) || numbers.includes(Number(field.type));
+}
+
+export function resolveFields(fields, fieldIds, creatorTableId) {
   const byId = new Map();
   for (const field of fields) {
     if (typeof field?.field_id !== "string") continue;
@@ -98,18 +112,38 @@ export function resolveFields(fields, fieldIds) {
     byId.set(field.field_id, entries);
   }
   const bindings = {};
-  for (const key of ["timestamp", "creator", "followerCount", "communityCount"]) {
+  for (const key of [
+    "timestamp",
+    "creator",
+    "followerCount",
+    "recentPostCount30d",
+    "latestPostAt",
+    "nickname",
+    "avatar",
+    "featureObservationData",
+  ]) {
     const id = fieldIds[key];
     const matches = byId.get(id) ?? [];
     assert(matches.length === 1, matches.length ? `field ID is duplicated: ${id}` : `field ID is missing: ${id}`);
     const field = matches[0];
     assert(typeof field.field_name === "string" && field.field_name, `field name is unavailable for ID: ${id}`);
-    bindings[key] = { id, name: field.field_name, type: Number(field.type) };
+    bindings[key] = { id, name: field.field_name, type: Number(field.type), uiType: String(field.ui_type ?? ""), property: field.property ?? null };
   }
-  assert(new Set(Object.values(bindings).map((field) => field.name)).size === 4, "resolved field names must be distinct");
-  for (const key of ["followerCount", "communityCount"]) {
-    assert(bindings[key].type === 2, `metric field is not numeric: ${bindings[key].id}`);
+  assert(new Set(Object.values(bindings).map((field) => field.name)).size === 8, "resolved field names must be distinct");
+  assert(typeMatches(bindings.timestamp, ["DateTime", "CreatedTime"], [5, 1005]), "timestamp field is not date-time");
+  assert(typeMatches(bindings.creator, ["DuplexLink"], [21]), "creator field is not a relation");
+  if (creatorTableId) {
+    assert(bindings.creator.property?.table_id === creatorTableId, "creator relation target changed");
+    assert(bindings.creator.property?.multiple === false, "creator relation must be single-value");
   }
+  for (const key of ["followerCount", "recentPostCount30d"]) {
+    assert(typeMatches(bindings[key], ["Number"], [2]), `metric field is not numeric: ${bindings[key].id}`);
+  }
+  assert(typeMatches(bindings.latestPostAt, ["DateTime"], [5]), "latest-post field is not date-time");
+  for (const key of ["nickname", "featureObservationData"]) {
+    assert(typeMatches(bindings[key], ["Text"], [1]), `text field has changed type: ${bindings[key].id}`);
+  }
+  assert(typeMatches(bindings.avatar, ["Attachment"], [17]), "avatar field is not an attachment");
   return bindings;
 }
 
@@ -121,6 +155,19 @@ function parseCount(value) {
 
 function countIsPresent(value) {
   return value !== null && value !== undefined && value !== "";
+}
+
+function parseDate(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = typeof value === "number" ? value : Date.parse(String(value));
+  return Number.isFinite(number) ? number : null;
+}
+
+function parseText(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && typeof value.text === "string") return value.text;
+  return undefined;
 }
 
 function jstDate(milliseconds) {
@@ -165,11 +212,36 @@ function normalizeProfileRecord(record, bindings, nowMs) {
   if (!Number.isFinite(timestampMs)) reasons.push("invalid_timestamp");
   else if (timestampMs > nowMs + FUTURE_CLOCK_MARGIN_MS) reasons.push("future_timestamp");
   const rawFollower = fields[bindings.followerCount.name];
-  const rawCommunity = fields[bindings.communityCount.name];
+  const rawRecentPosts = fields[bindings.recentPostCount30d.name];
+  const rawLatestPost = fields[bindings.latestPostAt.name];
+  const rawNickname = fields[bindings.nickname.name];
+  const rawAvatar = fields[bindings.avatar.name];
+  const rawFeatureData = fields[bindings.featureObservationData.name];
   const followerCount = parseCount(rawFollower);
-  const communityCount = parseCount(rawCommunity);
+  const recentPostCount30d = parseCount(rawRecentPosts);
+  const latestPostAtMs = parseDate(rawLatestPost);
+  const nickname = parseText(rawNickname);
+  const featureObservationText = parseText(rawFeatureData);
+  let featureObservationPresent = false;
+  if (featureObservationText !== null && featureObservationText !== undefined) {
+    try {
+      const parsed = JSON.parse(featureObservationText);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
+      featureObservationPresent = true;
+    } catch {
+      reasons.push("invalid_feature_observation_json");
+    }
+  }
+  let avatarPresent = false;
+  if (rawAvatar !== null && rawAvatar !== undefined && rawAvatar !== "") {
+    if (!Array.isArray(rawAvatar)) reasons.push("invalid_avatar");
+    else avatarPresent = rawAvatar.length > 0;
+  }
   if (countIsPresent(rawFollower) && followerCount === null) reasons.push("invalid_follower_count");
-  if (countIsPresent(rawCommunity) && communityCount === null) reasons.push("invalid_community_count");
+  if (countIsPresent(rawRecentPosts) && recentPostCount30d === null) reasons.push("invalid_recent_post_count");
+  if (countIsPresent(rawLatestPost) && latestPostAtMs === null) reasons.push("invalid_latest_post_at");
+  if (countIsPresent(rawNickname) && nickname === undefined) reasons.push("invalid_nickname");
+  if (countIsPresent(rawFeatureData) && featureObservationText === undefined) reasons.push("invalid_feature_observation_text");
   if (reasons.length) {
     return { valid: false, record_id: String(record?.record_id ?? ""), reasons: [...new Set(reasons)].sort() };
   }
@@ -179,7 +251,11 @@ function normalizeProfileRecord(record, bindings, nowMs) {
     creator_record_id: creatorIds[0],
     timestamp_ms: timestampMs,
     follower_count: followerCount,
-    community_count: communityCount,
+    recent_post_count_30d: recentPostCount30d,
+    latest_post_at_ms: latestPostAtMs,
+    nickname_present: nickname !== null && nickname !== undefined,
+    avatar_present: avatarPresent,
+    feature_observation_present: featureObservationPresent,
   };
 }
 
@@ -196,10 +272,18 @@ function mark(keepReasons, record, reason) {
 function markRepresentative(keepReasons, bucketLabel, records) {
   const ordered = [...records].sort(compareRecords);
   mark(keepReasons, ordered.at(-1), `${bucketLabel}:latest`);
-  const latestFollower = ordered.filter((record) => record.follower_count !== null).at(-1);
-  const latestCommunity = ordered.filter((record) => record.community_count !== null).at(-1);
-  if (latestFollower) mark(keepReasons, latestFollower, `${bucketLabel}:follower`);
-  if (latestCommunity) mark(keepReasons, latestCommunity, `${bucketLabel}:community`);
+  const metrics = [
+    ["follower", (record) => record.follower_count !== null],
+    ["recent-posts", (record) => record.recent_post_count_30d !== null],
+    ["latest-post", (record) => record.latest_post_at_ms !== null],
+    ["nickname", (record) => record.nickname_present],
+    ["avatar", (record) => record.avatar_present],
+    ["feature-observation", (record) => record.feature_observation_present],
+  ];
+  for (const [name, present] of metrics) {
+    const latest = ordered.filter(present).at(-1);
+    if (latest) mark(keepReasons, latest, `${bucketLabel}:${name}`);
+  }
 }
 
 export function buildCompactionPlan(profileRecords, bindings, source, nowMs = Date.now()) {
@@ -278,7 +362,12 @@ export function buildCompactionPlan(profileRecords, bindings, source, nowMs = Da
 }
 
 function sourceFromConfig(config) {
-  return { app_token: config.appToken, table_id: config.tableId, field_ids: config.fieldIds };
+  return {
+    app_token: config.appToken,
+    creator_table_id: config.creatorTableId,
+    table_id: config.tableId,
+    field_ids: config.fieldIds,
+  };
 }
 
 export function validatePlan(plan, config) {
@@ -297,7 +386,7 @@ export function validatePlan(plan, config) {
 async function runtime(config, client) {
   const activeClient = client ?? await LarkBaseClient.fromEnvironment({ origin: config.apiOrigin });
   const fields = await activeClient.listFields(config.appToken, config.tableId);
-  const bindings = resolveFields(fields, config.fieldIds);
+  const bindings = resolveFields(fields, config.fieldIds, config.creatorTableId);
   const records = await activeClient.listRecords(config.appToken, config.tableId);
   return { client: activeClient, bindings, records };
 }

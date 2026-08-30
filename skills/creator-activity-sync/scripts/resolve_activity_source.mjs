@@ -51,7 +51,13 @@ export async function resolveActivitySource(args) {
   }
   const snapshot = validateActivitySnapshot(await readFromProvider(provider, request));
   await writePrivateJson(path.resolve(args.output), snapshot);
-  return { providerPackage: provider.packageName, providerVersion: provider.packageVersion, snapshot };
+  return {
+    providerPackage: provider.packageName,
+    providerVersion: provider.packageVersion,
+    providerBinding: provider.bindingId,
+    knowledgeVersion: provider.knowledgeVersion,
+    snapshot,
+  };
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -62,6 +68,8 @@ export async function main(argv = process.argv.slice(2)) {
         status: "normalized",
         providerPackage: result.providerPackage,
         providerVersion: result.providerVersion,
+        providerBinding: result.providerBinding,
+        knowledgeVersion: result.knowledgeVersion,
         month: result.snapshot.month,
         rowCount: result.snapshot.rowCount,
       }),

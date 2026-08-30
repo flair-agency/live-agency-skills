@@ -10,6 +10,10 @@ knowledge of the observation service. The public core knows only a versioned
 normalized observation contract and Lark field IDs supplied by private local
 configuration.
 
+For every Lark Base read or mutation, follow the policy supplied by the
+installed Lark Base provider.
+This skill's transition, approval, and avatar rules remain mandatory.
+
 ## Source boundary
 
 Prepare the requested creator accounts from Lark, then obtain observations in
@@ -81,7 +85,8 @@ refresh records regardless of the due view.
 
 Read [references/lark-config.md](references/lark-config.md) for the private
 field-ID-only configuration. Resolve current field names from IDs at runtime.
-Use the Lark API only; never edit through the UI.
+Use batch APIs for approved creates and updates. On a provider limit, use only
+the shared policy's exact import/browser fallback.
 
 Use `LARK_TENANT_ACCESS_TOKEN`, `LARK_APP_ID` plus `LARK_APP_SECRET`, or an
 explicit `LARK_KEYCHAIN_SERVICE`. Never put credential values in plans,

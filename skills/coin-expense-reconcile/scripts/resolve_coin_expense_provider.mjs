@@ -56,12 +56,21 @@ export async function resolveCoinExpenseProvider(args) {
       status: "instructions-required",
       providerPackage: provider.packageName,
       providerVersion: provider.packageVersion,
+      providerBinding: provider.bindingId,
+      knowledgeVersion: provider.knowledgeVersion,
       instructions: provider.instructions,
     };
   }
   const output = mode.validate(await readFromProvider(provider, request));
   await writePrivateJson(path.resolve(args.output), output);
-  return { status: "normalized", providerPackage: provider.packageName, providerVersion: provider.packageVersion, output };
+  return {
+    status: "normalized",
+    providerPackage: provider.packageName,
+    providerVersion: provider.packageVersion,
+    providerBinding: provider.bindingId,
+    knowledgeVersion: provider.knowledgeVersion,
+    output,
+  };
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -69,10 +78,22 @@ export async function main(argv = process.argv.slice(2)) {
     const result = await resolveCoinExpenseProvider(parseArgs(argv));
     if (result.status === "instructions-required") {
       console.log(result.instructions);
-      console.error(JSON.stringify({ status: result.status, providerPackage: result.providerPackage, providerVersion: result.providerVersion }));
+      console.error(JSON.stringify({
+        status: result.status,
+        providerPackage: result.providerPackage,
+        providerVersion: result.providerVersion,
+        providerBinding: result.providerBinding,
+        knowledgeVersion: result.knowledgeVersion,
+      }));
       return 10;
     }
-    console.log(JSON.stringify({ status: result.status, providerPackage: result.providerPackage, providerVersion: result.providerVersion }));
+    console.log(JSON.stringify({
+      status: result.status,
+      providerPackage: result.providerPackage,
+      providerVersion: result.providerVersion,
+      providerBinding: result.providerBinding,
+      knowledgeVersion: result.knowledgeVersion,
+    }));
     return 0;
   } catch (error) {
     const code = error instanceof ProviderResolutionError ? error.code : "INVALID_INPUT";

@@ -45,6 +45,8 @@ export async function resolveProfileSource(args) {
       status: "instructions-required",
       providerPackage: provider.packageName,
       providerVersion: provider.packageVersion,
+      providerBinding: provider.bindingId,
+      knowledgeVersion: provider.knowledgeVersion,
       instructions: provider.instructions,
     };
   }
@@ -54,6 +56,8 @@ export async function resolveProfileSource(args) {
     status: "normalized",
     providerPackage: provider.packageName,
     providerVersion: provider.packageVersion,
+    providerBinding: provider.bindingId,
+    knowledgeVersion: provider.knowledgeVersion,
     observations,
   };
 }
@@ -67,6 +71,8 @@ export async function main(argv = process.argv.slice(2)) {
         status: result.status,
         providerPackage: result.providerPackage,
         providerVersion: result.providerVersion,
+        providerBinding: result.providerBinding,
+        knowledgeVersion: result.knowledgeVersion,
       }));
       return 10;
     }
@@ -74,6 +80,8 @@ export async function main(argv = process.argv.slice(2)) {
       status: result.status,
       providerPackage: result.providerPackage,
       providerVersion: result.providerVersion,
+      providerBinding: result.providerBinding,
+      knowledgeVersion: result.knowledgeVersion,
       observedAt: result.observations.observedAt,
       rowCount: result.observations.rowCount,
     }));

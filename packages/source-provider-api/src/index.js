@@ -3,10 +3,11 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const API_PACKAGE_NAME = "@live-agency-skills/source-provider-api";
-export const API_VERSION = "1.3.0";
+export const API_VERSION = "1.6.0";
 export const ACTIVITY_CAPABILITY = "creator-activity-source/v1";
 export const INVITATION_CAPABILITY = "creator-invitation-observation-source/v1";
-export const PROFILE_OBSERVATION_CAPABILITY = "creator-profile-observation-source/v1";
+export const PROFILE_OBSERVATION_CAPABILITY = "creator-profile-observation-source/v2";
+export const LIVE_HISTORY_OBSERVATION_CAPABILITY = "creator-live-history-observation-source/v1";
 export const GIFT_HISTORY_CAPABILITY = "gift-history-snapshot-source/v1";
 export const COIN_PURCHASE_EVIDENCE_CAPABILITY = "coin-purchase-evidence-source/v1";
 export const EXPENSE_CANDIDATE_CAPABILITY = "expense-candidate-source/v1";
@@ -54,37 +55,83 @@ function compatibleMajor(range, version) {
   return Boolean(match) && Number(match[1]) === expectedMajor;
 }
 
+function validateBinding(packageName, packageDir, binding, bindingId) {
+  if (!binding || typeof binding !== "object" || Array.isArray(binding)) {
+    throw new ProviderResolutionError(
+      "INVALID_MANIFEST",
+      `${packageName} provider binding ${bindingId} is invalid`,
+    );
+  }
+  if (
+    !Array.isArray(binding.provides) ||
+    binding.provides.length === 0 ||
+    binding.provides.some((value) => !/^[-a-z0-9]+\/v\d+$/.test(value))
+  ) {
+    throw new ProviderResolutionError(
+      "INVALID_MANIFEST",
+      `${packageName} provider binding ${bindingId} must declare at least one versioned capability`,
+    );
+  }
+  if (
+    binding.inputKinds !== undefined &&
+    (!Array.isArray(binding.inputKinds) ||
+      binding.inputKinds.some((value) => typeof value !== "string" || !value))
+  ) {
+    throw new ProviderResolutionError(
+      "INVALID_MANIFEST",
+      `${packageName} provider binding ${bindingId} has invalid inputKinds`,
+    );
+  }
+  if (
+    binding.knowledgeVersion !== undefined &&
+    (typeof binding.knowledgeVersion !== "string" || !binding.knowledgeVersion.trim())
+  ) {
+    throw new ProviderResolutionError(
+      "INVALID_MANIFEST",
+      `${packageName} provider binding ${bindingId} has an invalid knowledgeVersion`,
+    );
+  }
+  if (!binding.execution || !["module", "instructions"].includes(binding.execution.kind)) {
+    throw new ProviderResolutionError(
+      "INVALID_MANIFEST",
+      `${packageName} provider binding ${bindingId} must declare module or instructions execution`,
+    );
+  }
+  if (binding.execution.kind === "module") {
+    safePackageResource(packageDir, binding.execution.entry, `${bindingId}.execution.entry`);
+  } else {
+    safePackageResource(packageDir, binding.execution.resource, `${bindingId}.execution.resource`);
+    if (
+      binding.execution.resources !== undefined &&
+      (!Array.isArray(binding.execution.resources) ||
+        binding.execution.resources.some((value) => typeof value !== "string"))
+    ) {
+      throw new ProviderResolutionError(
+        "INVALID_MANIFEST",
+        `${packageName} provider binding ${bindingId} has invalid instruction resources`,
+      );
+    }
+    for (const [index, resource] of (binding.execution.resources ?? []).entries()) {
+      safePackageResource(
+        packageDir,
+        resource,
+        `${bindingId}.execution.resources[${index}]`,
+      );
+    }
+  }
+  return { ...binding, id: bindingId };
+}
+
 export function validateProviderPackage(packageName, packageJson, packageDir) {
   const manifest = packageJson.liveAgencyProvider;
   if (!manifest) return null;
 
-  if (manifest.schemaVersion !== 1) {
+  if (![1, 2].includes(manifest.schemaVersion)) {
     throw new ProviderResolutionError(
       "INVALID_MANIFEST",
       `${packageName} uses an unsupported provider manifest version`,
     );
   }
-  if (
-    !Array.isArray(manifest.provides) ||
-    manifest.provides.length === 0 ||
-    manifest.provides.some((value) => !/^[-a-z0-9]+\/v\d+$/.test(value))
-  ) {
-    throw new ProviderResolutionError(
-      "INVALID_MANIFEST",
-      `${packageName} must declare at least one versioned capability`,
-    );
-  }
-  if (
-    manifest.inputKinds !== undefined &&
-    (!Array.isArray(manifest.inputKinds) ||
-      manifest.inputKinds.some((value) => typeof value !== "string" || !value))
-  ) {
-    throw new ProviderResolutionError(
-      "INVALID_MANIFEST",
-      `${packageName} has invalid inputKinds`,
-    );
-  }
-
   const peerRange = packageJson.peerDependencies?.[API_PACKAGE_NAME];
   if (!peerRange || !compatibleMajor(peerRange, API_VERSION)) {
     throw new ProviderResolutionError(
@@ -94,16 +141,28 @@ export function validateProviderPackage(packageName, packageJson, packageDir) {
     );
   }
 
-  if (!manifest.execution || !["module", "instructions"].includes(manifest.execution.kind)) {
-    throw new ProviderResolutionError(
-      "INVALID_MANIFEST",
-      `${packageName} must declare module or instructions execution`,
-    );
-  }
-  if (manifest.execution.kind === "module") {
-    safePackageResource(packageDir, manifest.execution.entry, "execution.entry");
+  let bindings;
+  if (manifest.schemaVersion === 1) {
+    bindings = [validateBinding(packageName, packageDir, manifest, "default")];
   } else {
-    safePackageResource(packageDir, manifest.execution.resource, "execution.resource");
+    if (!Array.isArray(manifest.bindings) || manifest.bindings.length === 0) {
+      throw new ProviderResolutionError(
+        "INVALID_MANIFEST",
+        `${packageName} must declare at least one provider binding`,
+      );
+    }
+    const ids = new Set();
+    bindings = manifest.bindings.map((binding, index) => {
+      const bindingId = String(binding?.id ?? "").trim();
+      if (!/^[-a-z0-9]+$/.test(bindingId) || ids.has(bindingId)) {
+        throw new ProviderResolutionError(
+          "INVALID_MANIFEST",
+          `${packageName} provider binding ${index} has an invalid or duplicate id`,
+        );
+      }
+      ids.add(bindingId);
+      return validateBinding(packageName, packageDir, binding, bindingId);
+    });
   }
 
   return {
@@ -111,6 +170,7 @@ export function validateProviderPackage(packageName, packageJson, packageDir) {
     packageDir,
     packageVersion: packageJson.version,
     manifest,
+    bindings,
   };
 }
 
@@ -122,8 +182,18 @@ export async function discoverProviders({ rootDir = process.cwd(), dependencyNam
   for (const packageName of names) {
     const packageDir = packagePath(rootDir, packageName);
     const packageJson = await readJson(path.join(packageDir, "package.json"));
-    const provider = validateProviderPackage(packageName, packageJson, packageDir);
-    if (provider) providers.push(provider);
+    const providerPackage = validateProviderPackage(packageName, packageJson, packageDir);
+    if (!providerPackage) continue;
+    for (const binding of providerPackage.bindings) {
+      providers.push({
+        packageName: providerPackage.packageName,
+        packageDir: providerPackage.packageDir,
+        packageVersion: providerPackage.packageVersion,
+        bindingId: binding.id,
+        knowledgeVersion: binding.knowledgeVersion ?? null,
+        manifest: binding,
+      });
+    }
   }
   return providers;
 }
@@ -136,10 +206,16 @@ async function loadProvider(descriptor) {
       manifest.execution.resource,
       "execution.resource",
     );
+    const additionalPaths = (manifest.execution.resources ?? []).map((resource, index) =>
+      safePackageResource(packageDir, resource, `execution.resources[${index}]`));
+    const instructionParts = [await readFile(resourcePath, "utf8")];
+    for (const additionalPath of additionalPaths) {
+      instructionParts.push(await readFile(additionalPath, "utf8"));
+    }
     return {
       ...descriptor,
       executionKind: "instructions",
-      instructions: await readFile(resourcePath, "utf8"),
+      instructions: instructionParts.join("\n\n"),
     };
   }
 
@@ -187,7 +263,13 @@ export async function resolveProvider({ providers, capability, request, unattend
     throw new ProviderResolutionError(
       "PROVIDER_AMBIGUOUS",
       `More than one installed provider can supply ${capability} for ${request.inputKind}`,
-      { capability, packages: loaded.map((provider) => provider.packageName) },
+      {
+        capability,
+        providers: loaded.map((provider) => ({
+          packageName: provider.packageName,
+          bindingId: provider.bindingId,
+        })),
+      },
     );
   }
   return loaded[0];
@@ -302,7 +384,7 @@ export function validateInvitationObservations(snapshot) {
   return snapshot;
 }
 
-const PROFILE_METRIC_STATUSES = new Set([
+const OBSERVATION_STATUSES = new Set([
   "observed_exact",
   "observed_rounded",
   "not_available",
@@ -322,7 +404,7 @@ const LIVE_STOP_REASONS = new Set([
 ]);
 
 function validateObservedCount({ value, status, display }, label, { rounded = true } = {}) {
-  if (!PROFILE_METRIC_STATUSES.has(status)) {
+  if (!OBSERVATION_STATUSES.has(status)) {
     throw new TypeError(`${label} status is invalid`);
   }
   if (value === null) {
@@ -338,6 +420,72 @@ function validateObservedCount({ value, status, display }, label, { rounded = tr
   }
   if (typeof display !== "string" || !display.trim()) {
     throw new TypeError(`${label} rounded value requires display text`);
+  }
+}
+
+function validateObservedValue({ value, status }, label) {
+  if (!OBSERVATION_STATUSES.has(status)) throw new TypeError(`${label} status is invalid`);
+  if (value === null) {
+    if (["observed_exact", "observed_rounded"].includes(status)) {
+      throw new TypeError(`${label} null value cannot be observed`);
+    }
+    return;
+  }
+  if (status !== "observed_exact") throw new TypeError(`${label} value requires observed_exact`);
+}
+
+function validateAvatar(avatar, label) {
+  assertObject(avatar, label);
+  if (typeof avatar.path !== "string" || !path.isAbsolute(avatar.path)) {
+    throw new TypeError(`${label} path must be absolute`);
+  }
+  if (!/^[0-9a-f]{64}$/.test(avatar.sha256 ?? "")) {
+    throw new TypeError(`${label} sha256 is invalid`);
+  }
+  if (!Number.isSafeInteger(avatar.size) || avatar.size < 1) {
+    throw new TypeError(`${label} size is invalid`);
+  }
+  if (typeof avatar.name !== "string" || !avatar.name || /[\\/\0\r\n]/.test(avatar.name)) {
+    throw new TypeError(`${label} name is invalid`);
+  }
+  if (typeof avatar.mimeType !== "string" || !avatar.mimeType.startsWith("image/")) {
+    throw new TypeError(`${label} mimeType is invalid`);
+  }
+}
+
+function validateFeatureObservationData(value, label, creator) {
+  assertObject(value, label);
+  if (!Number.isSafeInteger(value.schema_version) || value.schema_version < 1) {
+    throw new TypeError(`${label} schema_version is invalid`);
+  }
+  let encoded;
+  try {
+    encoded = JSON.stringify(value);
+  } catch {
+    throw new TypeError(`${label} must be JSON serializable`);
+  }
+  if (Buffer.byteLength(encoded, "utf8") > 100_000) {
+    throw new TypeError(`${label} exceeds 100000 bytes`);
+  }
+  if (value.observation?.observed_at !== undefined) {
+    assertIsoDateTime(value.observation.observed_at, `${label} observation.observed_at`);
+    if (Date.parse(value.observation.observed_at) !== Date.parse(creator.observedAt)) {
+      throw new TypeError(`${label} observation timestamp does not match creator observedAt`);
+    }
+  }
+  if (
+    value.profile?.display_name !== undefined &&
+    creator.profile.nickname !== null &&
+    value.profile.display_name !== creator.profile.nickname
+  ) {
+    throw new TypeError(`${label} display_name does not match profile nickname`);
+  }
+  if (
+    value.posts?.last_30_days_count !== undefined &&
+    creator.profile.recentPostCount30d !== null &&
+    value.posts.last_30_days_count !== creator.profile.recentPostCount30d
+  ) {
+    throw new TypeError(`${label} last_30_days_count does not match profile value`);
   }
 }
 
@@ -382,13 +530,89 @@ export function validateProfileObservations(snapshot) {
     );
     validateObservedCount(
       {
-        value: creator.profile.communityCount,
-        status: creator.profile.communityStatus,
-        display: creator.profile.communityDisplay,
+        value: creator.profile.recentPostCount30d,
+        status: creator.profile.recentPostStatus,
       },
-      `${label} community`,
+      `${label} recent posts`,
+      { rounded: false },
     );
+    validateObservedValue(
+      { value: creator.profile.latestPostAt, status: creator.profile.latestPostStatus },
+      `${label} latest post`,
+    );
+    if (creator.profile.latestPostAt !== null) {
+      assertIsoDateTime(creator.profile.latestPostAt, `${label} latestPostAt`);
+    }
+    validateObservedValue(
+      { value: creator.profile.nickname, status: creator.profile.nicknameStatus },
+      `${label} nickname`,
+    );
+    if (
+      creator.profile.nickname !== null &&
+      (typeof creator.profile.nickname !== "string" || !creator.profile.nickname.trim())
+    ) {
+      throw new TypeError(`${label} nickname must be non-empty text or null`);
+    }
+    validateObservedValue(
+      { value: creator.profile.avatar, status: creator.profile.avatarStatus },
+      `${label} avatar`,
+    );
+    if (creator.profile.avatar !== null) validateAvatar(creator.profile.avatar, `${label} avatar`);
+    validateObservedValue(
+      {
+        value: creator.profile.featureObservationData,
+        status: creator.profile.featureObservationStatus,
+      },
+      `${label} feature observation data`,
+    );
+    if (creator.profile.featureObservationData !== null) {
+      validateFeatureObservationData(
+        creator.profile.featureObservationData,
+        `${label} feature observation data`,
+        creator,
+      );
+    }
+  }
+  return snapshot;
+}
 
+export function validateLiveHistoryObservations(snapshot) {
+  assertObject(snapshot, "live-history observations");
+  assertIsoDateTime(snapshot.observedAt, "live-history observations observedAt");
+  if (!Array.isArray(snapshot.creators)) {
+    throw new TypeError("live-history observations creators must be an array");
+  }
+  if (snapshot.rowCount !== snapshot.creators.length) {
+    throw new TypeError("live-history observations rowCount must match creators.length");
+  }
+
+  const creatorIds = new Set();
+  const accountKeys = new Set();
+  for (const [index, creator] of snapshot.creators.entries()) {
+    const label = `live-history creator ${index}`;
+    assertObject(creator, label);
+    for (const key of ["creatorRecordId", "accountKey"]) {
+      if (typeof creator[key] !== "string" || !creator[key].trim()) {
+        throw new TypeError(`${label} ${key} is required`);
+      }
+    }
+    if (creatorIds.has(creator.creatorRecordId)) {
+      throw new TypeError(`live-history creatorRecordId is duplicated: ${creator.creatorRecordId}`);
+    }
+    if (accountKeys.has(creator.accountKey)) {
+      throw new TypeError(`live-history accountKey is duplicated: ${creator.accountKey}`);
+    }
+    creatorIds.add(creator.creatorRecordId);
+    accountKeys.add(creator.accountKey);
+    assertIsoDateTime(creator.observedAt, `${label} observedAt`);
+    validateObservedCount(
+      {
+        value: creator.fanClubCount,
+        status: creator.fanClubStatus,
+        display: creator.fanClubDisplay,
+      },
+      `${label} fan club`,
+    );
     assertObject(creator.liveScan, `${label} liveScan`);
     if (!LIVE_SCAN_MODES.has(creator.liveScan.mode)) {
       throw new TypeError(`${label} liveScan.mode is invalid`);
@@ -600,6 +824,64 @@ export function validateExpenseCandidates(snapshot) {
   assertPlainText(snapshot.expenseAccountKey, "expense candidates expenseAccountKey");
   assertIsoDateTime(snapshot.observedAt, "expense candidates observedAt");
   validateCoverage(snapshot.coverage, "expense candidates coverage");
+  if (snapshot.registrationLookup !== undefined) {
+    assertObject(snapshot.registrationLookup, "expense candidates registrationLookup");
+    if (typeof snapshot.registrationLookup.complete !== "boolean") {
+      throw new TypeError("expense candidates registrationLookup complete must be boolean");
+    }
+    if (snapshot.registrationLookup.complete) {
+      assertNonNegativeInteger(
+        snapshot.registrationLookup.sourceTransactionIdCount,
+        "expense candidates registrationLookup sourceTransactionIdCount",
+      );
+      if (!/^[0-9a-f]{64}$/.test(snapshot.registrationLookup.sourceTransactionIdsSha256 ?? "")) {
+        throw new TypeError("expense candidates registrationLookup sourceTransactionIdsSha256 is invalid");
+      }
+    }
+  }
+  const existingRegistrations = snapshot.existingRegistrations ?? [];
+  if (!Array.isArray(existingRegistrations)) {
+    throw new TypeError("expense candidates existingRegistrations must be an array");
+  }
+  if ((snapshot.existingRegistrationCount ?? 0) !== existingRegistrations.length) {
+    throw new TypeError("expense candidates existingRegistrationCount must match existingRegistrations.length");
+  }
+  const registrationKeys = new Set();
+  const registeredTransactionIds = new Set();
+  let previousRegistrationOrder = null;
+  for (const [index, registration] of existingRegistrations.entries()) {
+    const label = `existing registration ${index}`;
+    assertObject(registration, label);
+    for (const key of ["registrationKey", "sourceTransactionId"]) {
+      assertPlainText(registration[key], `${label} ${key}`);
+    }
+    if (registration.state !== "registered") throw new TypeError(`${label} state is invalid`);
+    if (registration.destinationVerified !== true) {
+      throw new TypeError(`${label} must be destination-verified`);
+    }
+    if (!["memo_exact", "attachment_filename_exact"].includes(registration.evidenceMethod)) {
+      throw new TypeError(`${label} evidenceMethod is invalid`);
+    }
+    if (registrationKeys.has(registration.registrationKey)) {
+      throw new TypeError(`${label} registrationKey is duplicated`);
+    }
+    if (registeredTransactionIds.has(registration.sourceTransactionId)) {
+      throw new TypeError(`${label} sourceTransactionId is duplicated`);
+    }
+    registrationKeys.add(registration.registrationKey);
+    registeredTransactionIds.add(registration.sourceTransactionId);
+    const order = [registration.sourceTransactionId, registration.registrationKey];
+    if (previousRegistrationOrder && compareOrderTuple(order, previousRegistrationOrder) <= 0) {
+      throw new TypeError(`${label} is not strictly ordered`);
+    }
+    previousRegistrationOrder = order;
+  }
+  if (
+    snapshot.registrationLookup?.complete &&
+    snapshot.registrationLookup.sourceTransactionIdCount < existingRegistrations.length
+  ) {
+    throw new TypeError("expense candidates existing registrations exceed lookup scope");
+  }
   if (!Array.isArray(snapshot.expenses)) throw new TypeError("expense candidates expenses must be an array");
   if (snapshot.rowCount !== snapshot.expenses.length) {
     throw new TypeError("expense candidates rowCount must match expenses.length");
