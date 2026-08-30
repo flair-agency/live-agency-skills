@@ -26,7 +26,7 @@ The current provider repositories are:
 | `live-agency-provider-backstage` | TikTok LIVE BackStage | activity exports/dashboard and invitation observation |
 | `live-agency-provider-tiktok-ios` | TikTok iPhone | LIVE-history observation and gift-history export |
 | `live-agency-provider-tiktok-web` | TikTok Web | public-profile observation and coin-purchase evidence |
-| `live-agency-provider-moneyforward` | MoneyForward Cloud Expense | expense candidates and reviewed registration |
+| `live-agency-provider-moneyforward-cloud-expense` | Money Forward Cloud Expense | expense candidates and reviewed registration |
 
 TikTok iPhone, TikTok Web, and BackStage are separate providers even though
 they belong to one product family. They have different authentication state,

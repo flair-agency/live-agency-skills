@@ -33,7 +33,7 @@ composition root.
 | `live-agency-provider-backstage` | activity export/paste and invitation observation |
 | `live-agency-provider-tiktok-ios` | LIVE-history/fan-club observation and gift-history export |
 | `live-agency-provider-tiktok-web` | public-profile observation and coin-purchase evidence |
-| `live-agency-provider-moneyforward` | expense candidates, accounting profile, and reviewed registration |
+| `live-agency-provider-moneyforward-cloud-expense` | Money Forward Cloud Expense candidates, accounting profile, and reviewed registration |
 
 The former capability-specific provider repositories are retained only until
 the new provider repositories are installed and verified. They must not receive
