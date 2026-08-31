@@ -87,6 +87,11 @@ browser/export snapshot may satisfy those reads only when it proves the same
 identities, field bindings, view membership, existing values, and attachment
 state required by the plan; otherwise use the read API exception.
 
+For an exact browser-grid date-time write, verify seconds from a fresh
+data-inclusive Base export according to the installed provider policy. A CSV
+or minute-formatted grid readback can verify only a plan that explicitly
+accepts minute precision; it cannot prove that stored seconds were discarded.
+
 For a new profile row, upload the avatar first and include its attachment token
 in the create payload. This lets record-created Lark flows observe nickname and
 avatar together. Use attachment append only to resume an otherwise exact
