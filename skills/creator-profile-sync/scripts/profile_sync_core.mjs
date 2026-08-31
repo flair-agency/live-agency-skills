@@ -68,6 +68,10 @@ function parseStoredDate(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function sameDateTimeMinute(leftMs, rightMs) {
+  return Math.floor(leftMs / 60_000) === Math.floor(rightMs / 60_000);
+}
+
 function parseStoredText(value) {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "string") return value;
@@ -203,7 +207,11 @@ function nonAvatarFieldsMatch(record, creator) {
     profile.recentPostCount30d !== null &&
     record.recentPostCount30d !== profile.recentPostCount30d
   ) return false;
-  if (profile.latestPostAtMs !== null && record.latestPostAtMs !== profile.latestPostAtMs) return false;
+  if (
+    profile.latestPostAtMs !== null &&
+    (record.latestPostAtMs === null ||
+      !sameDateTimeMinute(record.latestPostAtMs, profile.latestPostAtMs))
+  ) return false;
   if (profile.nickname !== null && record.nickname !== profile.nickname) return false;
   if (
     profile.featureObservationJson !== null &&

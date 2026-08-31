@@ -7,8 +7,8 @@ description: Prepare creator targets, validate normalized public-profile observa
 
 Append reviewed public-profile observations without embedding knowledge of the
 source service. The public core owns target selection, the normalized contract,
-exact reconciliation, constrained creates, avatar verification, and post-write
-verification.
+destination-aware reconciliation, constrained creates, avatar verification,
+and post-write verification.
 
 For every Lark Base read or mutation, follow the policy supplied by the
 installed Lark Base provider.
@@ -60,6 +60,10 @@ owner-only files.
   feature-observation JSON when both are present.
 - Treat a matching profile observation already written after its observation
   timestamp as already applied.
+- Preserve the normalized seconds in the source observation and
+  feature-observation JSON. When a Lark date-time surface stores or returns no
+  seconds, treat a stored latest-post time in the same UTC minute as equivalent
+  only for replay reconciliation; do not round the source observation itself.
 - Upload an observed avatar only from a verified owner-only local file whose
   size and SHA-256 match the normalized metadata. A missing attachment on an
   otherwise exact replay may be resumed through a separately counted operation.

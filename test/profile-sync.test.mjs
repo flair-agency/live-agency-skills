@@ -194,6 +194,45 @@ test("builds profile-only creates and treats unavailable values as replay wildca
   assert.equal(replay.summary.profileCreateCount, 0);
 });
 
+test("treats a latest-post timestamp truncated to the same minute as an applied replay", async () => {
+  const desired = observations({ profile: {
+    latestPostAt: "2030-01-30T01:00:37.000Z",
+  } });
+  const storedRecord = (latestPostAt) => ({
+    record_id: "recProfile0001",
+    fields: {
+      "Renamed Profile Time": Math.floor(NOW / 60_000) * 60_000,
+      "Renamed Creator": [CREATOR_ID],
+      "Renamed Followers": 12300,
+      "Renamed Recent Posts": 8,
+      "Renamed Latest Post": latestPostAt,
+      "Renamed Nickname": "Synthetic Creator",
+      "Renamed Feature Data": JSON.stringify(featureData()),
+      "Renamed Avatar": [],
+    },
+  });
+
+  const sameMinute = await buildProfileSyncPlan({
+    manifest: targetManifest(),
+    observations: desired,
+    profileRecords: [storedRecord(Date.parse("2030-01-30T01:00:00.000Z"))],
+    bindings: bindings(),
+    nowMs: NOW,
+  });
+  assert.equal(sameMinute.summary.profileAlreadyAppliedCount, 1);
+  assert.equal(sameMinute.summary.profileCreateCount, 0);
+
+  const adjacentMinute = await buildProfileSyncPlan({
+    manifest: targetManifest(),
+    observations: desired,
+    profileRecords: [storedRecord(Date.parse("2030-01-30T01:01:00.000Z"))],
+    bindings: bindings(),
+    nowMs: NOW,
+  });
+  assert.equal(adjacentMinute.summary.profileAlreadyAppliedCount, 0);
+  assert.equal(adjacentMinute.summary.profileCreateCount, 1);
+});
+
 test("resumes a missing avatar attachment without creating another profile row", async () => {
   const avatar = {
     path: "/private/synthetic/avatar.png",
