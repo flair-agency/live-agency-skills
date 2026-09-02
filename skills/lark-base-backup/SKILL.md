@@ -14,14 +14,21 @@ Read [references/backup-receipt.md](references/backup-receipt.md) before a run.
 ## Workflow
 
 1. Resolve one exact Base instance, one exact destination profile, and one
-   reviewed backup route. The private route must state whether it produces a
-   full Base export or a logical data snapshot and what its restore can recover.
+   reviewed backup route. For a requested full Base backup, require a native
+   full-Base export. Use the Provider's reviewed API export when available;
+   otherwise use its reviewed authenticated-browser export. Do not silently
+   downgrade a full backup to API record reads or a logical data snapshot. A
+   logical snapshot is allowed only when the requested backup class and restore
+   contract explicitly call for that narrower artifact.
 2. Query the shared receipt set for the same Base, schema fingerprint, backup
    class, and time period. Reuse a matching verified receipt.
 3. If coverage is absent, recheck immediately before acquisition. Do not use a
    same-name Drive file as a lock; Drive names are not unique.
-4. Acquire the artifact through the Lark Provider. Stop if the selected route
-   is unsupported or its schema is unrecognized.
+4. Acquire the artifact through the Lark Provider. A browser route may use an
+   already authenticated, unattended-capable session only when its private
+   Binding authorizes that execution. Authentication, CAPTCHA, an unknown UI,
+   an ambiguous download, or a mismatched Base stops the acquisition. Stop if
+   the selected route is unsupported or its artifact structure is unrecognized.
 5. Upload to the exact private storage destination without changing sharing.
    The production profile may point to the organization's `Logs` shared drive;
    the public skill stores only the logical destination reference.
@@ -52,6 +59,7 @@ deleted rows but do not replace a full Base backup.
 ## Completion report
 
 Report whether the run reused or created coverage, backup class, period,
-artifact kind, restore scope, byte count, artifact SHA-256, receipt SHA-256,
-verification time, and any duplicate-equivalent count. Never expose private
-identifiers, URLs, file contents, record data, or credentials.
+artifact kind, acquisition route class, restore scope, byte count, artifact
+SHA-256, receipt SHA-256, verification time, and any duplicate-equivalent
+count. Never expose private identifiers, URLs, file contents, record data, or
+credentials.

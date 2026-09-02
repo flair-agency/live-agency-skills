@@ -13,6 +13,7 @@ this shape:
   "backup_class": "daily",
   "period_key": "YYYY-MM-DD",
   "artifact_kind": "full-base-export",
+  "acquisition_route": "browser-full-base-export",
   "restore_scope": "full-base",
   "artifact_bytes": 1,
   "artifact_sha256": "64-lowercase-hex",
@@ -22,8 +23,11 @@ this shape:
 }
 ```
 
-`artifact_kind` and `restore_scope` are closed values declared by the reviewed
-private backup route. A logical snapshot must not claim full-Base recovery.
+`artifact_kind`, `acquisition_route`, and `restore_scope` are closed values
+declared by the reviewed private backup route. A logical snapshot must not
+claim full-Base recovery. For a full backup, API unavailability selects the
+reviewed browser export instead of changing `artifact_kind` to a logical
+snapshot.
 Private storage object IDs, URLs, tenant identifiers, table IDs, and credentials
 are excluded from the normalized receipt and remain in its owner-only private
 counterpart.
