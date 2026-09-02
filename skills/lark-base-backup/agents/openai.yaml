@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lark Base backup"
+  short_description: "Create and verify shared Base backups"
+  default_prompt: "Use $lark-base-backup to check the shared backup state and create a verified backup only when the configured period is not already covered."

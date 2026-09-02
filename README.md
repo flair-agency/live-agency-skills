@@ -54,6 +54,16 @@ See [Provider architecture](docs/provider-architecture.md).
 - [`creator-invitation-status-compaction`](skills/creator-invitation-status-compaction/SKILL.md):
   compacts only adjacent duplicate invitation states after a verified archive
   and supports semantic, avatar-preserving restoration.
+- [`lark-base-backup`](skills/lark-base-backup/SKILL.md): checks shared receipt
+  coverage and creates a full-readback-verified Base backup through private
+  Lark and storage Providers.
+- [`lark-base-backup-retention`](skills/lark-base-backup-retention/SKILL.md):
+  prepares reviewed retention plans without unattended backup deletion.
+- [`lark-base-disaster-recovery-drill`](skills/lark-base-disaster-recovery-drill/SKILL.md):
+  verifies restore into an isolated test destination without touching production.
+- [`lark-base-maintenance`](skills/lark-base-maintenance/SKILL.md): coordinates
+  backup coverage, per-table capacity, compaction dry runs, retention, and
+  recovery-drill status while keeping destructive work explicitly approved.
 - [`gift-history-sync`](skills/gift-history-sync/SKILL.md): validates normalized
   partial gift snapshots, preserves omitted master events, records recipient
   evidence, and prepares content-bound reviewed commits and projections.

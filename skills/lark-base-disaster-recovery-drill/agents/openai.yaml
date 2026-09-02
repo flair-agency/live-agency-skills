@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lark Base recovery drill"
+  short_description: "Verify that a Base backup can be restored"
+  default_prompt: "Use $lark-base-disaster-recovery-drill to prepare or run a reviewed isolated restore test without modifying the production Base."

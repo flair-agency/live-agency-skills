@@ -60,6 +60,19 @@ value. Do not create averages, totals, or replacement records.
 Planning and dry-run inspection are read-only. Authorization to collect or add
 profile observations is not authorization to delete history, and vice versa.
 
+## Coordinated maintenance handoff
+
+`lark-base-maintenance` may schedule `plan` and the read-only stale-plan check.
+Return only the plan SHA-256, build time, total, projected, deletion-candidate,
+and blocking counts to the coordinator; keep the full plan private. A schedule
+never authorizes deletion.
+
+For a coordinated deletion, require a content-verified full Base backup for the
+same Base and schema that completed no earlier than this plan. Recheck the plan,
+then require explicit approval of both the maintenance-plan hash and this exact
+child hash/count. After verified deletion, return the measured remaining count
+so the coordinator can create a post-maintenance backup.
+
 ## Commands
 
 ```sh

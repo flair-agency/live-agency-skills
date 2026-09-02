@@ -50,6 +50,20 @@ commands.
    count. Reread Lark after any response, verify every deletion and keeper, and
    never automatically retry an uncertain write.
 
+## Coordinated maintenance handoff
+
+`lark-base-maintenance` may schedule plan creation and read-only stale-plan
+inspection. Return only the plan SHA-256, build time, total, projected,
+deletion-candidate, and combined blocking counts; keep the full plan, avatar
+backup, and record IDs private. A schedule never authorizes archive upload or
+deletion.
+
+Before coordinated deletion, require both this skill's verified row-level
+restore archive and a content-verified full Base backup for the same Base and
+schema that completed no earlier than the plan. Require explicit approval of
+the maintenance-plan hash and this child hash/count. After verified deletion,
+return the measured remaining count for the post-maintenance backup.
+
 Deletion authorization does not authorize restore. Restore first runs as a dry
 run and reports archive SHA-256, create count, attachment-resume count, and
 conflicts. Applying restore requires separate exact approval. Restored record

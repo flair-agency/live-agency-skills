@@ -52,6 +52,19 @@ inside the exact rolling window, or sharing a creator/day with one, is deleted.
 
 Do not retry an uncertain write. Reconcile by rereading first.
 
+## Coordinated maintenance handoff
+
+`lark-base-maintenance` may schedule plan creation and read-only stale-plan
+inspection. Return only the plan SHA-256, build time, total, projected,
+deletion-candidate, and combined blocking counts; keep the full plan and record
+IDs private. A schedule never authorizes archive upload or deletion.
+
+Before coordinated deletion, require both this skill's verified row-level
+restore archive and a content-verified full Base backup for the same Base and
+schema that completed no earlier than the plan. Require explicit approval of
+the maintenance-plan hash and this child hash/count. After verified deletion,
+return the measured remaining count for the post-maintenance backup.
+
 ## Restore workflow
 
 Read the complete archive, verify both file and archive hashes, and dry-run it

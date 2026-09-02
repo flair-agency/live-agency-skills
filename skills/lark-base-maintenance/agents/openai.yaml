@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lark Base maintenance"
+  short_description: "Coordinate safe recurring Base maintenance"
+  default_prompt: "Use $lark-base-maintenance to inspect backup freshness, table capacity, compaction dry runs, retention, and recovery-drill status without performing unattended deletion."

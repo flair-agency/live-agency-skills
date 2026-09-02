@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lark Base backup retention"
+  short_description: "Plan safe retention for verified Base backups"
+  default_prompt: "Use $lark-base-backup-retention to prepare a reviewed retention plan for verified Lark Base backups. Do not delete any backup without explicit approval."

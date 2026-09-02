@@ -17,6 +17,10 @@ explicitly completed.
 | Creator LIVE-history and metrics sync | Complete | Service-specific LIVE provider, existing Lark summary fields/flow, and Lark configuration |
 | Creator LIVE-metrics compaction | Complete | Lark identifiers and generated plans |
 | Creator insight and LIVE-characteristic sync | Complete | Lark identifiers, private evidence contexts/proposals, and approved tag vocabulary |
+| Lark Base backup | Public contract complete; Provider route pending | Lark export details, storage identifiers, artifacts, and receipts |
+| Lark Base backup retention | Public contract complete; storage mutation pending | Storage identifiers, receipts, and exact delete plans |
+| Lark Base disaster-recovery drill | Public contract complete; restore route pending | Test destination, restore implementation, artifacts, and drill receipts |
+| Lark Base recurring maintenance | Planner complete; production profile pending | Record limits, cadence, backup receipts, and child plans |
 | Gift-history reconciliation | Complete | Export acquisition/schema, workbook/Lark identifiers, and account evidence |
 | Coin-expense reconciliation | Complete | Purchase evidence, expense candidates, service-specific registration, and organization accounting policy |
 
