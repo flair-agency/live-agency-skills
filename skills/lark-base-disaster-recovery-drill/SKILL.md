@@ -17,7 +17,9 @@ Read [references/drill-contract.md](references/drill-contract.md) before a run.
 2. Produce a dry-run describing the isolated destination, expected scope,
    record-count checks, schema checks, attachment limitations, and cleanup
    plan. A scheduled run stops here unless test creation is separately
-   preauthorized.
+   preauthorized. Use `scripts/drill_core.mjs` to build and content-bind this
+   preflight; do not hand-wave an unverified artifact or production destination
+   into a ready state.
 3. Restore only into a newly created or explicitly designated non-production
    test Base. Never import into, overwrite, truncate, or repurpose production.
 4. Compare table/field topology, per-table record counts, deterministic logical
