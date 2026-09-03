@@ -153,3 +153,37 @@ test("rejects unreviewed capacity ratios and unsupported compaction skills", () 
   unsupported.tables[0].compaction.skill = "unknown-compaction";
   assert.throws(() => buildMaintenancePlan(unsupported), /unsupported/);
 });
+
+test("monitors tables without a compaction skill and escalates only on capacity pressure", () => {
+  const healthy = buildMaintenancePlan(state({
+    tables: [{
+      alias: "management-activity",
+      record_count: 100,
+      record_limit: 20_000,
+      compaction: null,
+    }],
+  }));
+  assert.equal(healthy.tables[0].compaction.status, "not-configured");
+  assert.equal(healthy.summary.unconfigured_compaction_table_count, 1);
+  assert.equal(healthy.summary.capacity_without_compaction_count, 0);
+  assert.equal(healthy.actions.length, 0);
+
+  const warning = buildMaintenancePlan(state({
+    tables: [{
+      alias: "management-activity",
+      record_count: 16_000,
+      record_limit: 20_000,
+      compaction: null,
+    }],
+  }));
+  assert.equal(warning.tables[0].capacity_status, "warning");
+  assert.deepEqual(warning.actions, [{
+    stage: 2,
+    action: "review-capacity-without-compaction",
+    skill: null,
+    table_alias: "management-activity",
+    priority: "normal",
+  }]);
+  assert.equal(warning.summary.capacity_without_compaction_count, 1);
+  assert.equal(warning.summary.unattended_mutation_count, 0);
+});

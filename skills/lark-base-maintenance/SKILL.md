@@ -22,7 +22,9 @@ Provider policy and require an unattended-capable Binding for scheduled work.
    period already has a matching verified backup, reuse it. Otherwise create
    and verify one. Do not rely on a file name or lock file as identity.
 3. Read current record counts and evaluate every configured table against its
-   warning and critical ratios.
+   warning and critical ratios. A table without an approved compaction Skill is
+   still monitored; capacity pressure becomes a review action rather than an
+   invented deletion plan.
 4. At least weekly, and immediately when a threshold is crossed, run the
    applicable compaction skill in dry-run mode:
    `creator-profile-compaction`, `creator-live-history-compaction`,

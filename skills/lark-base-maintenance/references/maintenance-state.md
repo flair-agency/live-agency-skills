@@ -45,6 +45,12 @@ For `ready`, include `built_at`, `plan_sha256`, `delete_candidate_count`,
 `projected_record_count`, and `blocking_count: 0`. For `blocked`, include a
 positive `blocking_count`. Never embed the full child plan or record IDs.
 
+Use `"compaction": null` for a table that must be capacity-monitored but has no
+approved compaction Skill. Healthy unconfigured tables require no compaction
+action. A warning, critical, or exhausted unconfigured table produces a
+non-mutating `review-capacity-without-compaction` action; the planner never
+invents a deletion strategy.
+
 Each backup receipt follows `lark-base-backup`'s normalized receipt contract.
 The planner selects only receipts with matching Base alias and schema, verified
 status, valid hashes, and nonfuture timestamps. Daily coverage requires a

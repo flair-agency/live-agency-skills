@@ -153,6 +153,14 @@ function latestBackup(receipts, base, observedAtMs, maxAgeMs, timezone) {
 }
 
 function normalizeCompaction(value, tableAlias, observedAtMs) {
+  if (value === null) {
+    return {
+      skill: null,
+      status: "not-configured",
+      last_dry_run_at: null,
+      last_dry_run_at_ms: null,
+    };
+  }
   assert(value && typeof value === "object" && !Array.isArray(value), `tables.${tableAlias}.compaction is required`);
   const skill = text(value.skill, `tables.${tableAlias}.compaction.skill`);
   assert(COMPACTION_SKILLS.includes(skill), `tables.${tableAlias}.compaction.skill is unsupported`);
@@ -226,12 +234,21 @@ export function buildMaintenancePlan(state) {
         : utilizationRatio >= policy.warning_ratio
           ? "warning"
           : "healthy";
-    const compactionDue = due(compaction.last_dry_run_at_ms, policy.compaction_interval_days * DAY_MS, observedAtMs);
-    if (compactionDue || capacityStatus !== "healthy") {
+    const compactionDue = compaction.skill !== null
+      && due(compaction.last_dry_run_at_ms, policy.compaction_interval_days * DAY_MS, observedAtMs);
+    if (compaction.skill !== null && (compactionDue || capacityStatus !== "healthy")) {
       actions.push({
         stage: 2,
         action: "run-compaction-dry-run",
         skill: compaction.skill,
+        table_alias: alias,
+        priority: ["critical", "exhausted"].includes(capacityStatus) ? "high" : "normal",
+      });
+    } else if (compaction.skill === null && capacityStatus !== "healthy") {
+      actions.push({
+        stage: 2,
+        action: "review-capacity-without-compaction",
+        skill: null,
         table_alias: alias,
         priority: ["critical", "exhausted"].includes(capacityStatus) ? "high" : "normal",
       });
@@ -303,6 +320,9 @@ export function buildMaintenancePlan(state) {
       warning_table_count: tablePlans.filter((table) => table.capacity_status === "warning").length,
       critical_table_count: tablePlans.filter((table) => ["critical", "exhausted"].includes(table.capacity_status)).length,
       blocked_compaction_count: tablePlans.filter((table) => table.compaction.status === "blocked").length,
+      unconfigured_compaction_table_count: tablePlans.filter((table) => table.compaction.status === "not-configured").length,
+      capacity_without_compaction_count: tablePlans.filter((table) =>
+        table.compaction.status === "not-configured" && table.capacity_status !== "healthy").length,
       compaction_review_count: tablePlans.filter((table) => table.compaction.review_ready).length,
       unattended_mutation_count: 0,
       action_count: actions.length,
