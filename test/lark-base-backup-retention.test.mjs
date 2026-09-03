@@ -50,6 +50,7 @@ function state(overrides = {}) {
     observed_at: OBSERVED_AT,
     timezone: "Asia/Tokyo",
     base_alias: "creator-scouting",
+    successful_drill_references_complete: true,
     policy: {
       daily_days: 35,
       monthly_months: 24,
@@ -166,4 +167,11 @@ test("an empty verified set is a blocking state", () => {
   assert.equal(plan.summary.blocking_count, 1);
   assert.equal(plan.summary.ready_for_review, false);
   assert.equal(plan.blocking_issues[0].code, "no-verified-backup");
+});
+
+test("requires complete successful-drill reference coverage", () => {
+  assert.throws(
+    () => buildRetentionPlan(state({ successful_drill_references_complete: false })),
+    /reference coverage must be complete/,
+  );
 });

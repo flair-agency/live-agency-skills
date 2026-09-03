@@ -176,6 +176,8 @@ function addUniqueObjectRef(refs, value, label) {
 
 function normalizeVerifiedPair(value, index, baseAlias, refs) {
   assert(value && typeof value === "object" && !Array.isArray(value), `verified_pairs.${index} must be an object`);
+  assert(typeof value.pre_change_released === "boolean", `verified_pairs.${index}.pre_change_released must be boolean`);
+  assert(typeof value.successful_drill_referenced === "boolean", `verified_pairs.${index}.successful_drill_referenced must be boolean`);
   const artifactObjectRef = addUniqueObjectRef(refs, value.artifact_object_ref, `verified_pairs.${index}.artifact_object_ref`);
   const receiptObjectRef = addUniqueObjectRef(refs, value.receipt_object_ref, `verified_pairs.${index}.receipt_object_ref`);
   const receipt = normalizeVerifiedReceipt(value.receipt, baseAlias);
@@ -186,8 +188,8 @@ function normalizeVerifiedPair(value, index, baseAlias, refs) {
     receipt_object_ref: receiptObjectRef,
     artifact_bytes: artifactBytes,
     receipt_bytes: positiveInteger(value.receipt_bytes, `verified_pairs.${index}.receipt_bytes`),
-    pre_change_released: value.pre_change_released === true,
-    successful_drill_referenced: value.successful_drill_referenced === true,
+    pre_change_released: value.pre_change_released,
+    successful_drill_referenced: value.successful_drill_referenced,
     receipt,
   };
 }
@@ -235,6 +237,7 @@ export function buildRetentionPlan(state) {
   const currentMonthOrdinal = monthOrdinal(currentDate);
   const baseAlias = requiredText(state.base_alias, "base_alias");
   const policy = normalizePolicy(state.policy);
+  assert(state.successful_drill_references_complete === true, "successful recovery-drill reference coverage must be complete");
   assert(Array.isArray(state.verified_pairs), "verified_pairs must be an array");
   assert(Array.isArray(state.orphans), "orphans must be an array");
   assert(Array.isArray(state.invalid_receipts), "invalid_receipts must be an array");
@@ -315,6 +318,7 @@ export function buildRetentionPlan(state) {
     timezone,
     base_alias: baseAlias,
     policy,
+    successful_drill_references_complete: true,
     keep,
     delete_candidates: deleteCandidates,
     blocking_issues: blockingIssues,

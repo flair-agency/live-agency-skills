@@ -38,6 +38,7 @@ validating each receipt. It must classify unresolved objects separately.
   "observed_at": "RFC3339 timestamp",
   "timezone": "IANA timezone",
   "base_alias": "configured-logical-alias",
+  "successful_drill_references_complete": true,
   "policy": {
     "daily_days": 90,
     "monthly_months": 24,
@@ -67,5 +68,7 @@ validating each receipt. It must classify unresolved objects separately.
 
 Every object reference must be unique across all classifications. Artifact byte
 counts must match their verified receipts. Receipt hashes are recomputed before
-planning. Any orphan or invalid receipt blocks deletion review and is never
+planning. The input must prove complete lookup of retained successful
+recovery-drill receipts; an omitted or partial lookup cannot mean “not
+referenced.” Any orphan or invalid receipt blocks deletion review and is never
 silently promoted to a deletion candidate.
