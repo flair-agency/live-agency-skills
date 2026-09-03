@@ -25,8 +25,9 @@ Read [references/drill-contract.md](references/drill-contract.md) before a run.
 4. Compare table/field topology, per-table record counts, deterministic logical
    hashes where supported, formulas/relations, and documented unsupported
    objects. Do not treat a successful import dialog as verification.
-5. Create a drill receipt bound to backup receipt, test destination, measured
-   checks, result, and verification time.
+5. Create a drill receipt with `scripts/drill_core.mjs`, bound to the verified
+   backup receipt and successful measured checks. Do not publish it until test
+   cleanup is separately approved, executed, and verified.
 6. Test-destination cleanup is a separate destructive operation. Require
    explicit approval or an exact preauthorized ephemeral environment; verify
    cleanup by rereading.

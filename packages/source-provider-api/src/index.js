@@ -12,6 +12,7 @@ export const GIFT_HISTORY_CAPABILITY = "gift-history-snapshot-source/v1";
 export const COIN_PURCHASE_EVIDENCE_CAPABILITY = "coin-purchase-evidence-source/v1";
 export const EXPENSE_CANDIDATE_CAPABILITY = "expense-candidate-source/v1";
 export const EXPENSE_REGISTRATION_CAPABILITY = "expense-registration-sink/v1";
+export const BACKUP_ARTIFACT_STORAGE_CAPABILITY = "backup-artifact-storage/v1";
 
 export class ProviderResolutionError extends Error {
   constructor(code, message, details = {}) {

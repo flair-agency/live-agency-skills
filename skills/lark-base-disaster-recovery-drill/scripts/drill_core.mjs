@@ -94,3 +94,77 @@ export function buildDrillPreflight({ backupReceipt, profile, executionMode, tes
   return Object.freeze({ ...plan, plan_sha256: sha256Json(plan) });
 }
 
+function preflightCore(value) {
+  assert(value && typeof value === "object" && !Array.isArray(value), "preflight must be an object");
+  const { plan_sha256: ignored, ...core } = value;
+  assert(SHA256.test(String(value.plan_sha256 ?? "")), "preflight plan_sha256 is invalid");
+  assert(sha256Json(core) === value.plan_sha256, "preflight plan_sha256 does not match content");
+  assert(value.status === "ready-for-isolated-restore", "preflight is not authorized for restore");
+  assert(value.test_creation_authorized === true, "test creation is not authorized");
+  assert(value.destination_policy === "new-non-production-base", "preflight destination is not isolated");
+  assert(value.cleanup_policy === "separate-explicit-approval", "preflight cleanup policy is invalid");
+  assert(SHA256.test(String(value.backup_receipt_sha256 ?? "")), "backup_receipt_sha256 is invalid");
+  return value;
+}
+
+function timestamp(value, label) {
+  const normalized = requiredText(value, label);
+  assert(Number.isFinite(Date.parse(normalized)) && /(?:Z|[+-]\d{2}:\d{2})$/.test(normalized), `${label} must be an RFC3339 timestamp`);
+  return normalized;
+}
+
+function drillReceiptCore(value) {
+  assert(value && typeof value === "object" && !Array.isArray(value), "drill receipt must be an object");
+  assert(value.version === 1 && value.status === "verified", "drill receipt must be verified version 1");
+  assert(value.restore_scope === "full-base", "drill receipt restore_scope must be full-base");
+  assert(value.schema_check === "matched", "schema check must be matched");
+  assert(value.record_count_check === "matched", "record-count check must be matched");
+  assert(["matched", "not-supported"].includes(value.logical_hash_check), "logical-hash check is invalid");
+  assert(value.cleanup_status === "verified", "cleanup must be verified before completing a drill");
+  const backupReceiptSha256 = requiredText(value.backup_receipt_sha256, "backup_receipt_sha256");
+  assert(SHA256.test(backupReceiptSha256), "backup_receipt_sha256 is invalid");
+  return {
+    version: 1,
+    status: "verified",
+    base_alias: requiredText(value.base_alias, "base_alias"),
+    backup_receipt_sha256: backupReceiptSha256,
+    restore_scope: "full-base",
+    schema_check: "matched",
+    record_count_check: "matched",
+    logical_hash_check: value.logical_hash_check,
+    completed_at: timestamp(value.completed_at, "completed_at"),
+    cleanup_status: "verified",
+  };
+}
+
+export function calculateDrillReceiptSha256(value) {
+  return sha256Json(drillReceiptCore(value));
+}
+
+export function normalizeVerifiedDrillReceipt(value) {
+  const core = drillReceiptCore(value);
+  const receiptSha256 = requiredText(value.receipt_sha256, "receipt_sha256");
+  assert(SHA256.test(receiptSha256), "receipt_sha256 is invalid");
+  assert(calculateDrillReceiptSha256(core) === receiptSha256, "receipt_sha256 does not match drill content");
+  return Object.freeze({ ...core, receipt_sha256: receiptSha256 });
+}
+
+export function buildVerifiedDrillReceipt({ preflight, schemaCheck, recordCountCheck, logicalHashCheck, cleanupStatus, completedAt }) {
+  const plan = preflightCore(preflight);
+  const core = drillReceiptCore({
+    version: 1,
+    status: "verified",
+    base_alias: plan.base_alias,
+    backup_receipt_sha256: plan.backup_receipt_sha256,
+    restore_scope: plan.restore_scope,
+    schema_check: schemaCheck,
+    record_count_check: recordCountCheck,
+    logical_hash_check: logicalHashCheck,
+    completed_at: completedAt,
+    cleanup_status: cleanupStatus,
+  });
+  return normalizeVerifiedDrillReceipt({
+    ...core,
+    receipt_sha256: calculateDrillReceiptSha256(core),
+  });
+}

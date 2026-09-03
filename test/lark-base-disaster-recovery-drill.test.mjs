@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildVerifiedDrillReceipt,
   buildDrillPreflight,
+  normalizeVerifiedDrillReceipt,
   sha256Json,
 } from "../skills/lark-base-disaster-recovery-drill/scripts/drill_core.mjs";
 
@@ -80,3 +82,45 @@ test("rejects unverified, logical-only, mismatched, and production destinations"
   );
 });
 
+test("publishes a content-bound drill receipt only after successful checks and cleanup", () => {
+  const preflight = buildDrillPreflight({
+    backupReceipt: backup(),
+    profile: profile(),
+    executionMode: "interactive",
+    testCreationAuthorized: true,
+  });
+  const receipt = buildVerifiedDrillReceipt({
+    preflight,
+    schemaCheck: "matched",
+    recordCountCheck: "matched",
+    logicalHashCheck: "not-supported",
+    cleanupStatus: "verified",
+    completedAt: "2030-01-02T12:04:05Z",
+  });
+  assert.equal(normalizeVerifiedDrillReceipt(receipt).receipt_sha256, receipt.receipt_sha256);
+  assert.throws(
+    () => normalizeVerifiedDrillReceipt({ ...receipt, logical_hash_check: "matched" }),
+    /does not match drill content/,
+  );
+});
+
+test("does not complete a drill with mismatched checks, uncertain cleanup, or dry-run authority", () => {
+  const ready = buildDrillPreflight({
+    backupReceipt: backup(),
+    profile: profile(),
+    executionMode: "interactive",
+    testCreationAuthorized: true,
+  });
+  const result = {
+    preflight: ready,
+    schemaCheck: "matched",
+    recordCountCheck: "matched",
+    logicalHashCheck: "matched",
+    cleanupStatus: "verified",
+    completedAt: "2030-01-02T12:04:05Z",
+  };
+  assert.throws(() => buildVerifiedDrillReceipt({ ...result, schemaCheck: "mismatched" }), /schema check/);
+  assert.throws(() => buildVerifiedDrillReceipt({ ...result, cleanupStatus: "uncertain" }), /cleanup must be verified/);
+  const dryRun = buildDrillPreflight({ backupReceipt: backup(), profile: profile(), executionMode: "scheduled" });
+  assert.throws(() => buildVerifiedDrillReceipt({ ...result, preflight: dryRun }), /not authorized/);
+});
