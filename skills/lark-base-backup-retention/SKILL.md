@@ -22,9 +22,11 @@ planning.
 3. Treat equivalent concurrent backups as ordinary verified generations. A
    duplicate name is not evidence of duplicate content; compare receipt scope,
    period, schema, artifact kind, and SHA-256.
-4. Produce a content-bound plan containing exact storage object IDs, plan
-   SHA-256, keep/delete counts, bytes reclaimed, and every blocking issue. Keep
-   the plan owner-only.
+4. Normalize the private listing and run `scripts/retention_plan.mjs`. It
+   produces a content-bound plan containing exact storage object references,
+   plan SHA-256, keep/delete counts, bytes proposed, and every blocking issue.
+   Never select generations by name or modification time. Keep the plan
+   owner-only.
 5. A schedule may create and publish the dry-run summary only. Delete only
    after explicit approval of the current plan SHA-256, exact object count, and
    byte count.
@@ -35,6 +37,18 @@ Suggested starting policy is daily generations for 90 days and monthly
 generations for 24 months for Scouting, and daily generations for 35 days and
 monthly generations for 12 months for Management. These values belong to the
 private policy and may be changed without changing this skill.
+
+## Build a dry-run plan
+
+```bash
+node scripts/retention_plan.mjs plan \
+  --input /absolute/private/normalized-retention-state.json \
+  --output /absolute/private/lark-backup-retention-plan.json
+```
+
+This command only writes an owner-only dry-run plan. It does not call Google
+Drive and cannot delete storage objects. A separate reviewed execution must
+revalidate the current plan and receive explicit approval.
 
 ## Completion report
 
