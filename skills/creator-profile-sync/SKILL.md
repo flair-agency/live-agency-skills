@@ -36,6 +36,19 @@ URLs, UI labels, parsing rules, or device procedures to this skill.
 An unattended run is allowed only when the provider manifest explicitly
 declares it. Authentication or human interaction stops an unattended run.
 
+## Version 2 migration dual run
+
+Until this Skill's version 2 route is separately approved, version 1 remains
+authoritative. For migration comparison only, read
+[references/v2-dual-run.md](references/v2-dual-run.md). Run the version 1 path
+and the Creator Scouting MCP profile-observation path against the same exact
+reviewed target manifest, prepare both destination dry-run plans, and compare
+them with `scripts/compare_profile_v2_dual_run.mjs`.
+
+The comparison never authorizes an apply, profile-write activation, scheduled-
+route switch, or version 1 retirement. Keep every comparison input and report
+owner-only and outside Git.
+
 ## Target selection
 
 If a snapshot cannot provide stable creator record IDs and current field

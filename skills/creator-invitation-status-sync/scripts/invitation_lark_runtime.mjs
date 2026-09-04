@@ -16,6 +16,18 @@ export function sha256Json(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+export function refreshPlanSha256(plan) {
+  return sha256Json({
+    version: plan.version,
+    operationMode: plan.operationMode,
+    generatedAt: plan.generatedAt,
+    manifest: plan.manifest,
+    observations: plan.observations,
+    operations: plan.operations,
+    counts: plan.counts,
+  });
+}
+
 export { writePrivateJson };
 
 export async function loadInvitationConfig(filePath) {
@@ -102,8 +114,10 @@ export function resolveInvitationFields(creatorFields, stateFields, fieldIds) {
       "state externalUserId",
     ),
   };
-  const names = [creatorAccount.name, ...Object.values(state).map((value) => value.name)];
-  if (new Set(names).size !== names.length) throw new TypeError("resolved field names are not unique");
+  const stateNames = Object.values(state).map((value) => value.name);
+  if (new Set(stateNames).size !== stateNames.length) {
+    throw new TypeError("resolved state field names are not unique");
+  }
   return { creatorAccount, state };
 }
 
@@ -268,7 +282,7 @@ export async function prepareRefresh({ client, config, manifest, observations })
     resolveAttachmentHash: (attachment) => client.attachmentSha256(attachment),
   });
   if (manifest.targetMode === "due") {
-    for (const row of [...corePlan.creates, ...corePlan.updates]) {
+    for (const row of [...corePlan.creates, ...corePlan.updates, ...corePlan.attachExisting]) {
       if (!dueIds.has(row.creatorRecordId)) {
         corePlan.staleObservations.push({
           accountKey: row.accountKey,
@@ -278,9 +292,7 @@ export async function prepareRefresh({ client, config, manifest, observations })
     }
   }
   const operations = operationSnapshot(corePlan);
-  const planSha256 = sha256Json({ manifest, observations });
   return {
-    planSha256,
     corePlan,
     operations,
     counts: refreshCounts(corePlan),
@@ -324,20 +336,26 @@ export async function applyRefresh({
   config,
   manifest,
   observations,
-  expectedPlanSha256,
+  reviewedOperations,
+  reviewedCounts,
   confirmCreate,
   confirmUpdate,
   confirmAttach,
+  confirmAlreadyApplied,
 }) {
   const prepared = await prepareRefresh({ client, config, manifest, observations });
-  if (prepared.planSha256 !== expectedPlanSha256) {
-    throw new TypeError("live plan hash differs from the reviewed plan");
+  if (
+    sha256Json(prepared.operations) !== sha256Json(reviewedOperations) ||
+    sha256Json(prepared.counts) !== sha256Json(reviewedCounts)
+  ) {
+    throw new TypeError("live plan differs from the reviewed plan");
   }
   if (prepared.blocked) throw new TypeError("live plan has blocking conflicts");
   if (
     prepared.counts.create !== confirmCreate ||
     prepared.counts.update !== confirmUpdate ||
-    prepared.counts.attach !== confirmAttach
+    prepared.counts.attach !== confirmAttach ||
+    prepared.counts.alreadyApplied !== confirmAlreadyApplied
   ) {
     throw new TypeError("live plan counts differ from the reviewed confirmation");
   }

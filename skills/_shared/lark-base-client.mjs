@@ -1,4 +1,4 @@
-export const LARK_MEDIA_MAX_BYTES = 20 * 1024 * 1024;
+export const LARK_MEDIA_MAX_BYTES = 5 * 1024 * 1024;
 
 export async function createLarkBaseClient(options = {}) {
   const { keychainService, env = process.env, ...clientOptions } = options;

@@ -61,6 +61,25 @@ test("loads an instruction provider through its capability", async () => {
   assert.equal(observations.rowCount, 1);
 });
 
+test("invitation observations require a real timezone-aware ISO date-time", () => {
+  const snapshot = (observedAt) => ({
+    observedAt,
+    rowCount: 1,
+    creators: [{ accountKey: "synthetic_creator", state: "synthetic_pending" }],
+  });
+  assert.doesNotThrow(() =>
+    validateInvitationObservations(snapshot("2030-01-02T12:04:05.123+09:00")),
+  );
+  for (const value of [
+    "2030-01-02",
+    "2030-01-02T03:04:05",
+    "2030-02-30T03:04:05.000Z",
+    "2030-01-02T03:04:05.000+14:01",
+  ]) {
+    assert.throws(() => validateInvitationObservations(snapshot(value)), /ISO date-time/);
+  }
+});
+
 test("selects one binding from a multi-capability provider and loads its knowledge", async () => {
   const providers = await discoverProviders({
     rootDir,

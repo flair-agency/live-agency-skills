@@ -24,7 +24,8 @@
 
 Rules:
 
-- `observedAt` is the single observation timestamp for the complete set.
+- `observedAt` is the single timezone-aware ISO date-time timestamp for the
+  complete set. Date-only and timezone-less values are invalid.
 - `rowCount` equals `creators.length`.
 - `accountKey` is non-empty and unique after normalization.
 - `state` is a non-empty, provider-normalized value. The destination must have

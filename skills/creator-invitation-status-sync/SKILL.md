@@ -32,7 +32,11 @@ rules, or provider batch limits to this skill.
 
 For unattended runs, continue only when the provider manifest declares
 `unattended: true`. Authentication or human-interaction requirements stop an
-unattended run rather than being bypassed.
+unattended run rather than being bypassed. A scheduled run that resolves only
+an interactive instruction provider must issue a concise reminder to start an
+interactive observation run; it must not execute those instructions, silently
+substitute another provider, or copy provider-specific steps into this public
+skill.
 
 ## Refresh semantics
 
@@ -70,12 +74,28 @@ Use a private owner-only directory for target manifests, normalized
 observations, avatar files, and plans. They contain creator identifiers. Never
 commit or publish them.
 
+## Version 2 migration path
+
+For a version 2 dual run, read
+[references/v2-dual-run.md](references/v2-dual-run.md). Use the Creator Scouting
+MCP to observe and validate invitation eligibility from the exact same reviewed
+target manifest used by the version 1 path. Do not resolve a provider directly
+on the version 2 side.
+
+Compare target coverage, normalized values, proposed mutations, unavailable
+values, and stop reasons with
+`scripts/compare_invitation_v2_dual_run.mjs`. The comparison is dry-run only:
+it cannot activate a write profile, change a schedule, or apply either plan.
+Keep the version 1 route authoritative and available for rollback until a
+separate invitation-history domain write route is active, route switching is
+explicitly approved, and two scheduled version 2 cycles succeed.
+
 Use these deterministic helpers:
 
 - `scripts/export_invitation_targets.mjs --config CONFIG.json --output TARGETS.json`
 - `scripts/resolve_invitation_source.mjs --provider-root ROOT --request REQUEST.json --output OBSERVATIONS.json`
 - `scripts/sync_invitation_observations.mjs --config CONFIG.json --manifest TARGETS.json --observations OBSERVATIONS.json --output-plan PLAN.json`
-- after explicit approval, `scripts/sync_invitation_observations.mjs --config CONFIG.json --plan PLAN.json --apply --expect-sha256 HASH --confirm-create N --confirm-update N --confirm-attach N`
+- after explicit approval, `scripts/sync_invitation_observations.mjs --config CONFIG.json --plan PLAN.json --apply --expect-sha256 HASH --confirm-create N --confirm-update N --confirm-attach N --confirm-already-applied N`
 
 The target exporter defaults to the configured due view. Use `--mode selected`
 with repeated `--account` or `--mode all` only when the user explicitly asks to

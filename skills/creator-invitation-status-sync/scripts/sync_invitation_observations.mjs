@@ -11,7 +11,7 @@ import {
   applyRefresh,
   loadInvitationConfig,
   prepareRefresh,
-  sha256Json,
+  refreshPlanSha256,
   writePrivateJson,
 } from "./invitation_lark_runtime.mjs";
 
@@ -39,6 +39,7 @@ export function parseArgs(argv) {
         "--confirm-create",
         "--confirm-update",
         "--confirm-attach",
+        "--confirm-already-applied",
       ].includes(value)
     ) {
       const next = argv[index + 1];
@@ -58,7 +59,7 @@ export function parseArgs(argv) {
     if (!/^[0-9a-f]{64}$/.test(args.expectSha256 ?? "")) {
       throw new TypeError("apply mode requires --expect-sha256");
     }
-    for (const key of ["confirmCreate", "confirmUpdate", "confirmAttach"]) {
+    for (const key of ["confirmCreate", "confirmUpdate", "confirmAttach", "confirmAlreadyApplied"]) {
       if (!Number.isSafeInteger(args[key]) || args[key] < 0) {
         throw new TypeError(`apply mode requires --${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`);
       }
@@ -69,9 +70,9 @@ export function parseArgs(argv) {
   return args;
 }
 
-function summary(prepared) {
+function summary(prepared, planSha256) {
   return {
-    planSha256: prepared.planSha256,
+    planSha256,
     blocked: prepared.blocked,
     ...prepared.counts,
     identityConflicts: prepared.corePlan.identityConflicts,
@@ -84,27 +85,32 @@ function summary(prepared) {
 export async function dryRun({ client, config, manifest, observations, outputPlan }) {
   const prepared = await prepareRefresh({ client, config, manifest, observations });
   const plan = {
-    version: 1,
+    version: 2,
     operationMode: "refresh",
     generatedAt: new Date().toISOString(),
     manifest,
     observations,
     operations: prepared.operations,
     counts: prepared.counts,
-    planSha256: prepared.planSha256,
   };
+  plan.planSha256 = refreshPlanSha256(plan);
   await writePrivateJson(outputPlan, plan);
-  return summary(prepared);
+  return summary(prepared, plan.planSha256);
 }
 
 export async function applyReviewed({ client, config, reviewed, args }) {
-  if (reviewed?.version !== 1 || reviewed?.operationMode !== "refresh") {
+  if (
+    reviewed?.version !== 2 ||
+    reviewed?.operationMode !== "refresh" ||
+    typeof reviewed.generatedAt !== "string" ||
+    !reviewed.operations ||
+    typeof reviewed.operations !== "object" ||
+    !reviewed.counts ||
+    typeof reviewed.counts !== "object"
+  ) {
     throw new TypeError("reviewed plan format is invalid");
   }
-  const storedHash = sha256Json({
-    manifest: reviewed.manifest,
-    observations: reviewed.observations,
-  });
+  const storedHash = refreshPlanSha256(reviewed);
   if (storedHash !== reviewed.planSha256 || storedHash !== args.expectSha256) {
     throw new TypeError("reviewed plan hash is invalid");
   }
@@ -113,10 +119,12 @@ export async function applyReviewed({ client, config, reviewed, args }) {
     config,
     manifest: reviewed.manifest,
     observations: reviewed.observations,
-    expectedPlanSha256: args.expectSha256,
+    reviewedOperations: reviewed.operations,
+    reviewedCounts: reviewed.counts,
     confirmCreate: args.confirmCreate,
     confirmUpdate: args.confirmUpdate,
     confirmAttach: args.confirmAttach,
+    confirmAlreadyApplied: args.confirmAlreadyApplied,
   });
 }
 
