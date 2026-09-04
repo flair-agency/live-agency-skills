@@ -23,6 +23,7 @@ explicitly completed.
 | Lark Base recurring maintenance | Planner complete; production profile pending | Record limits, cadence, backup receipts, and child plans |
 | Gift-history reconciliation | Complete | Export acquisition/schema, workbook/Lark identifiers, and account evidence |
 | Coin-expense reconciliation | Complete | Purchase evidence, expense candidates, service-specific registration, and organization accounting policy |
+| Weekly coin-expense application | Frozen prototype; do not activate or schedule | Weekly applications remain manual; reopen only after explicit owner approval supported by official application-mutation API coverage or a materially different cost-benefit assessment |
 
 ## Private provider repositories
 

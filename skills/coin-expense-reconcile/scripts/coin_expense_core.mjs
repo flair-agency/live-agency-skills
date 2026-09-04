@@ -269,11 +269,12 @@ export function buildRegistrationBundle(plan, preparedAt = new Date().toISOStrin
   validateCoinExpensePlan(plan);
   assert(!coinExpensePlanIsBlocked(plan), "blocking issues prevent registration preparation");
   const content = {
-    version: 1,
+    version: 2,
     preparedAt,
     planSha256: plan.planSha256,
     serviceKey: plan.inputs.purchaseEvidence.serviceKey,
     expenseAccountKey: plan.inputs.expenseCandidates.expenseAccountKey,
+    requiredRegistrationMethod: "linked_payment_candidate",
     itemCount: plan.operations.exactMatches.length,
     totalJpy: plan.summary.exactMatchTotalJpy,
     items: plan.operations.exactMatches,
@@ -282,7 +283,9 @@ export function buildRegistrationBundle(plan, preparedAt = new Date().toISOStrin
 }
 
 export function validateRegistrationResult(result, bundle) {
-  assert(result?.version === 1, "registration result version is invalid");
+  assert(bundle?.version === 2, "registration bundle version is invalid");
+  assert(bundle.requiredRegistrationMethod === "linked_payment_candidate", "registration bundle method is invalid");
+  assert(result?.version === 2, "registration result version is invalid");
   assert(result.planSha256 === bundle.planSha256, "registration result plan SHA differs");
   assert(result.bundleSha256 === bundle.bundleSha256, "registration result bundle SHA differs");
   assert(typeof result.observedAt === "string" && !Number.isNaN(Date.parse(result.observedAt)), "registration result observedAt is invalid");
@@ -297,13 +300,24 @@ export function validateRegistrationResult(result, bundle) {
     seen.add(key);
     assert(["registered", "already_registered", "failed", "uncertain"].includes(item.status), `registration result ${index} status is invalid`);
     assert(typeof item.destinationVerified === "boolean", `registration result ${index} destinationVerified is invalid`);
+    assert(typeof item.candidateConsumed === "boolean", `registration result ${index} candidateConsumed is invalid`);
+    assert(typeof item.paymentSourceLinkageVerified === "boolean", `registration result ${index} paymentSourceLinkageVerified is invalid`);
+    assert(typeof item.registrationMethod === "string", `registration result ${index} registrationMethod is invalid`);
     if (["registered", "already_registered"].includes(item.status)) {
       assert(item.destinationVerified, `registration result ${index} was not destination-verified`);
+      assert(item.registrationMethod === bundle.requiredRegistrationMethod, `registration result ${index} method is not linked-payment registration`);
+      assert(item.candidateConsumed, `registration result ${index} did not consume the approved candidate`);
+      assert(item.paymentSourceLinkageVerified, `registration result ${index} did not verify payment-source linkage`);
     }
   }
   const missingApproved = [...expected.keys()].filter((key) => !seen.has(key));
   const verifiedCount = result.results.filter(
-    (item) => ["registered", "already_registered"].includes(item.status) && item.destinationVerified,
+    (item) =>
+      ["registered", "already_registered"].includes(item.status) &&
+      item.destinationVerified &&
+      item.registrationMethod === bundle.requiredRegistrationMethod &&
+      item.candidateConsumed &&
+      item.paymentSourceLinkageVerified,
   ).length;
   return {
     complete: missingApproved.length === 0 && verifiedCount === bundle.itemCount,

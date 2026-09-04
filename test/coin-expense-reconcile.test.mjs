@@ -253,8 +253,10 @@ test("registration results are bound to the approved bundle and destination veri
     nowMs: NOW,
   });
   const bundle = buildRegistrationBundle(plan, "2030-01-04T00:02:00.000Z");
+  assert.equal(bundle.version, 2);
+  assert.equal(bundle.requiredRegistrationMethod, "linked_payment_candidate");
   const summary = validateRegistrationResult({
-    version: 1,
+    version: 2,
     planSha256: bundle.planSha256,
     bundleSha256: bundle.bundleSha256,
     observedAt: "2030-01-04T00:03:00.000Z",
@@ -264,12 +266,15 @@ test("registration results are bound to the approved bundle and destination veri
       expenseKey: "expense-1",
       status: "registered",
       destinationVerified: true,
+      registrationMethod: "linked_payment_candidate",
+      candidateConsumed: true,
+      paymentSourceLinkageVerified: true,
     }],
   }, bundle);
   assert.equal(summary.complete, true);
   assert.throws(
     () => validateRegistrationResult({
-      version: 1,
+      version: 2,
       planSha256: bundle.planSha256,
       bundleSha256: bundle.bundleSha256,
       observedAt: "2030-01-04T00:03:00.000Z",
@@ -279,10 +284,39 @@ test("registration results are bound to the approved bundle and destination veri
         expenseKey: "expense-1",
         status: "registered",
         destinationVerified: false,
+        registrationMethod: "linked_payment_candidate",
+        candidateConsumed: true,
+        paymentSourceLinkageVerified: true,
       }],
     }, bundle),
     /not destination-verified/,
   );
+  for (const [overrides, message] of [
+    [{ registrationMethod: "manual" }, /method is not linked-payment registration/],
+    [{ candidateConsumed: false }, /did not consume the approved candidate/],
+    [{ paymentSourceLinkageVerified: false }, /did not verify payment-source linkage/],
+  ]) {
+    assert.throws(
+      () => validateRegistrationResult({
+        version: 2,
+        planSha256: bundle.planSha256,
+        bundleSha256: bundle.bundleSha256,
+        observedAt: "2030-01-04T00:03:00.000Z",
+        rowCount: 1,
+        results: [{
+          purchaseKey: "purchase-1",
+          expenseKey: "expense-1",
+          status: "registered",
+          destinationVerified: true,
+          registrationMethod: "linked_payment_candidate",
+          candidateConsumed: true,
+          paymentSourceLinkageVerified: true,
+          ...overrides,
+        }],
+      }, bundle),
+      message,
+    );
+  }
 });
 
 test("discovers separate interactive purchase and expense providers through npm", async () => {

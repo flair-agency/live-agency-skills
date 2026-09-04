@@ -18,6 +18,7 @@ hardcoded package name:
   receipt files;
 - `expense-candidate-source/v1` supplies relevant unregistered expense rows;
 - `expense-registration-sink/v1` applies only a reviewed registration bundle
+  to those same imported candidates, preserves their payment-source linkage,
   and returns reread evidence.
 
 Use `scripts/resolve_coin_expense_provider.mjs`. Instruction providers are
@@ -68,13 +69,17 @@ confirmation required for the external write. This action-time confirmation is
 required even when an earlier message requested registration. Follow
 [references/registration.md](references/registration.md). The private provider
 owns organization accounting policy, memo format, expense category, payment
-account treatment, and service-specific UI steps. It may write only the expense
-rows in the approved bundle and attach exactly the approved receipt per row.
+account treatment, and service-specific UI steps. It may edit only the existing
+imported expense candidates in the approved bundle and attach exactly the
+approved receipt per row. It must never satisfy the bundle by creating a new
+standalone or manual expense row.
 
 After each attempted write, reread destination state before retrying. Never
 blindly resubmit an uncertain result. Validate the provider result with
 `scripts/verify_expense_registration.mjs`; only destination-verified
-`registered` or `already_registered` results count as complete.
+`registered` or `already_registered` results count as complete, and only when
+the approved candidate was consumed and its payment-source linkage was
+destination-verified.
 
 ## Stop conditions
 
@@ -83,3 +88,6 @@ invalid or reused receipt evidence, duplicate stable keys, ambiguous matches,
 changed inputs, missing accounting decisions, authentication or CAPTCHA, an
 unverified destination result, or any provider stop condition. Unmatched or
 ambiguous groups do not authorize editing dates, amounts, or unrelated fields.
+Also stop when the provider can only create a standalone/manual expense, cannot
+consume the exact approved candidate, or cannot verify preserved payment-source
+linkage after registration.

@@ -18,15 +18,17 @@ Before the first external write:
 
 For each item, the provider may edit only the approved expense row, attach
 exactly its approved receipt, and apply its configured accounting profile. It
-must preserve unrelated imported fields. After submission it rereads the
-unregistered list or created expense state. An uncertain response is not a
-reason to submit again.
+must preserve unrelated imported fields and the imported payment-source
+linkage. It must not create a standalone or manual expense as a substitute.
+After submission it proves that the exact candidate was consumed and that the
+registered destination still exposes the expected linked-payment provenance.
+An uncertain response is not a reason to submit again.
 
 The owner-only result uses:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "planSha256": "reviewed plan SHA-256",
   "bundleSha256": "prepared bundle SHA-256",
   "observedAt": "2030-01-04T00:02:00.000Z",
@@ -36,12 +38,17 @@ The owner-only result uses:
       "purchaseKey": "purchase-1",
       "expenseKey": "expense-1",
       "status": "registered",
-      "destinationVerified": true
+      "destinationVerified": true,
+      "registrationMethod": "linked_payment_candidate",
+      "candidateConsumed": true,
+      "paymentSourceLinkageVerified": true
     }
   ]
 }
 ```
 
 Allowed statuses are `registered`, `already_registered`, `failed`, and
-`uncertain`. A positive status is valid only with `destinationVerified: true`.
-Keep failed or uncertain items unresolved and report the next human action.
+`uncertain`. A positive status is valid only with `destinationVerified: true`,
+`registrationMethod: linked_payment_candidate`, `candidateConsumed: true`, and
+`paymentSourceLinkageVerified: true`. Keep failed or uncertain items unresolved
+and report the next human action.

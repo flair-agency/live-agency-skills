@@ -1,0 +1,6 @@
+interface:
+  display_name: "Weekly Coin Expense Application"
+  short_description: "Frozen weekly expense application prototype"
+  default_prompt: "Use $coin-expense-weekly-application to review its frozen prototype status without executing it."
+policy:
+  allow_implicit_invocation: false

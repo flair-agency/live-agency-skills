@@ -9,11 +9,15 @@
     "schemaVersion": 1,
     "provides": [
       "expense-candidate-source/v1",
-      "expense-registration-sink/v1"
+      "expense-registration-sink/v1",
+      "weekly-expense-application-source/v1",
+      "weekly-expense-application-sink/v1"
     ],
     "inputKinds": [
       "application/x.synthetic-expense-candidates+json",
-      "application/x.synthetic-expense-registration+json"
+      "application/x.synthetic-expense-registration+json",
+      "application/x.synthetic-weekly-expense-source+json",
+      "application/x.synthetic-weekly-expense-application+json"
     ],
     "unattended": false,
     "execution": {
